@@ -17,7 +17,9 @@
   - `npm run test:seq`: 25 فحصاً ناجحاً (شاملة رصد لاحقة `end` واكتمال السلاسل `1..N` ونقل المكتمل وتجميع المجلدات حسب التاغ).
   - `npm run test:ext`: 11 فحصاً ناجحاً.
   - `node scripts/e2e.js`: 45 فحصاً ناجحاً على نافذة Electron الحقيقية (شاملة شارات المجلدات النصية `مكتمل` و`محدّث` وزوال `محدّث` بعد الفتح، وزر التحقق من التحديثات في قائمة "حول").
-- **جاهزية وحالة GitHub:** تم رفع الإصدار `v0.2.11` بنجاح إلى `https://github.com/taalkhalaf/nbrsflow.git` على فرع `origin/main` (الالتزام الأساسي `8233070 Release v0.2.11`).
+- **جاهزية وحالة GitHub:** تم رفع الإصدار `v0.2.11` بنجاح إلى `https://github.com/taalkhalaf/nbrsflow.git` على فرع `origin/main`، ونشر الإصدار الرسمي مع ملف المثبّت (`nbrsflow-setup-0.2.11.exe`, 129,266,302 بايت) على GitHub Releases:
+  - صفحة الإصدار: `https://github.com/taalkhalaf/nbrsflow/releases/tag/v0.2.11` (و`https://github.com/taalkhalaf/nbrsflow/releases/latest`)
+  - رابط التحميل المباشر: `https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.11.exe` (تم التحقق: HTTP 200).
 - تم إغلاق جميع العمليات الخلفية الخاصة بالتطوير والاختبار (`0` عمليات متبقية من بيئة التطوير)، ومجلد `D:\Ai\antigravity\nbrsflow_downloads_test` نظيف من أي مخلفات اختبار، و`nbrsflow-dev.bat` جاهز للتشغيل المباشر.
 
 ## 2. ما تم إنجازه في هذا الإصدار (`v0.2.11`)

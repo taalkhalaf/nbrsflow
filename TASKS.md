@@ -90,6 +90,6 @@
 - [x] **Phase 12: Production Packaging, Windows Installer & GitHub Release** (Windows x64 NSIS, unpacked `.exe` & official brand `.ico` built & verified; GitHub Actions deferred)
   - [x] Configure `electron-builder` for Windows x64 (`nsis`) with `extraResources` bundling `resources/bin/win32/aria2c.exe`, `extension/`, and `resources/brand/`.
   - [x] Build unpacked executable (`release\win-unpacked\nbrsflow.exe`) and NSIS installer (`release\nbrsflow-setup-0.2.9.exe`), verified in packaged mode (`app.isPackaged === true`).
-  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (pushed `Release v0.2.11` to `https://github.com/taalkhalaf/nbrsflow.git` on `origin/main`).
+  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (pushed `Release v0.2.11` to `https://github.com/taalkhalaf/nbrsflow.git` on `origin/main` and published GitHub Release `https://github.com/taalkhalaf/nbrsflow/releases/tag/v0.2.11` with `nbrsflow-setup-0.2.11.exe`).
   - [x] In-app GitHub Releases update checker & one-click auto-updater (`electron/appUpdater.ts`, `TopBar.tsx`, `SettingsDialog.tsx`, `App.tsx`).
   - [x] Integrate official `nbrsflow_brand_package` `.ico`/`.png` application, tray, extension, and NSIS installer icons (GitHub Actions automated release workflow deferred).
