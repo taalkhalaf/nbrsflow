@@ -33,7 +33,8 @@
 
 ## 3. الملفات التي تم إنشاؤها أو تعديلها (Files Created/Modified)
 - جديد: `src/components/SetupWizardModal.tsx`
-- معدّل: `package.json`, `extension/manifest.json`, `CHANGELOG.md`, `README.md`, `TASKS.md`, `AGENT_HANDOFF.md`, `src/types/metadata.ts`, `src/types/index.ts`, `src/i18n/index.ts`, `src/lib/meta.tsx`, `src/lib/utils.ts`, `src/components/ContextMenu.tsx`, `src/components/FolderIcon.tsx`, `src/components/ExplorerPane.tsx`, `src/components/Sidebar.tsx`, `src/components/SettingsDialog.tsx`, `src/App.tsx`, `electron/preload.ts`, `electron/main.ts`, `electron/fsOps.ts`, `electron/sequenceOrganizer.ts`, `scripts/test-fsops.js`, `scripts/test-sequence.js`, `scripts/e2e.js`
+- معدّل: `package.json`, `extension/manifest.json`, `CHANGELOG.md`, `README.md`, `docs/TASKS.md`, `docs/AGENT_HANDOFF.md`, `docs/PROJECT_BLUEPRINT.md`, `src/types/metadata.ts`, `src/types/index.ts`, `src/i18n/index.ts`, `src/lib/meta.tsx`, `src/lib/utils.ts`, `src/components/ContextMenu.tsx`, `src/components/FolderIcon.tsx`, `src/components/ExplorerPane.tsx`, `src/components/Sidebar.tsx`, `src/components/SettingsDialog.tsx`, `src/App.tsx`, `electron/preload.ts`, `electron/main.ts`, `electron/fsOps.ts`, `electron/sequenceOrganizer.ts`, `scripts/test-fsops.js`, `scripts/test-sequence.js`, `scripts/e2e.js`
+- منظّم/محذوف: نقل `PROJECT_BLUEPRINT.md` و`TASKS.md` و`AGENT_HANDOFF.md` إلى `docs/`، وحذف `nbrsflow_brand_package/` غير المستخدم في البناء والتشغيل.
 - مخرجات بناء (متجاهلة في `.gitignore`): `release/nbrsflow-setup-0.2.12.exe`, `release/win-unpacked/nbrsflow.exe`
 
 ## 4. المشاكل أو التحذيرات (Issues/Warnings)
