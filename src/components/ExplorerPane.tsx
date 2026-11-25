@@ -476,27 +476,27 @@ export default function ExplorerPane(p: Props) {
       const hasNew = (meta.metaOf(f.path)?.unopenedFiles?.length ?? 0) > 0;
       if (!hasDup && !hasNew && !isComplete) return null;
       return (
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex flex-wrap items-center justify-center gap-1">
           {isComplete && (
             <span
               data-testid="folder-complete-badge"
               title={ind?.totalEpisodes ? `${t.seriesCompleteTip} (${ind.totalEpisodes})` : t.seriesCompleteTip}
-              className="inline-flex items-center rounded-md border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-300"
-            >✓ {t.seriesCompleteBadge}</span>
+              className="rounded-md border border-emerald-500/45 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-300"
+            >{t.seriesCompleteBadge}</span>
+          )}
+          {hasNew && (
+            <span
+              data-testid="folder-updated-badge"
+              title={t.folderHasNewFileTip}
+              className="rounded-md border border-sky-500/45 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-sky-300"
+            >{t.folderUpdatedBadge}</span>
           )}
           {hasDup && (
             <span
               data-testid="folder-duplicate-badge"
-              title={t.folderHasDuplicatesTip}
+              title={ind?.duplicateReason ? `${t.folderHasDuplicatesTip}: ${ind.duplicateReason}` : t.folderHasDuplicatesTip}
               className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-500/60 bg-amber-500/20 text-[10px] font-bold leading-none text-amber-300"
             >!</span>
-          )}
-          {hasNew && (
-            <span
-              data-testid="folder-new-badge"
-              title={t.folderHasNewFileTip}
-              className="inline-flex h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/25"
-            />
           )}
         </span>
       );

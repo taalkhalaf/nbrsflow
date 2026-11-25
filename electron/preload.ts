@@ -111,6 +111,16 @@ const api: NbrsAPI = {
   },
   system: {
     sleep: () => ipcRenderer.invoke('system:sleep')
+  },
+  updater: {
+    getState: () => ipcRenderer.invoke('updater:getState'),
+    check: () => ipcRenderer.invoke('updater:check'),
+    downloadAndInstall: () => ipcRenderer.invoke('updater:downloadAndInstall'),
+    onStateChange: (cb) => {
+      const handler = (_e: unknown, state: import('../src/types').UpdateState) => cb(state);
+      ipcRenderer.on('updater:state', handler);
+      return () => { ipcRenderer.removeListener('updater:state', handler); };
+    }
   }
 };
 

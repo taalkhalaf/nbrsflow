@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Dict, Lang } from '../i18n';
 import { extractAndFilterUrls, type UrlFilterCategory } from '../lib/urlFilter';
-import type { ExtensionBridgeStatus, NbrsAPI } from '../types';
+import type { ExtensionBridgeStatus, NbrsAPI, UpdateState } from '../types';
 import {
   IconDownload,
   IconFolderOpen,
@@ -49,6 +49,9 @@ interface Props {
   onOpenExternalFolder: (folderPath: string) => Promise<void> | void;
   onOrganizeExternalFolder: (folderPath: string) => Promise<number> | number;
   onRestoreDefaults: () => Promise<void> | void;
+  updateState?: UpdateState | null;
+  onCheckForUpdates?: () => Promise<void> | void;
+  onUpdateNow?: () => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -85,6 +88,9 @@ export default function SettingsDialog({
   onOpenExternalFolder,
   onOrganizeExternalFolder,
   onRestoreDefaults,
+  updateState,
+  onCheckForUpdates,
+  onUpdateNow,
   onClose
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>('appearance');
@@ -779,9 +785,40 @@ export default function SettingsDialog({
                   <div className="min-w-0">
                     <div className="text-lg font-semibold tracking-tight text-fg">nbrsflow</div>
                     <div className="text-xs text-muted">{t.subtitle}</div>
-                    <div className="mt-1.5 inline-block rounded-md border border-line bg-panel px-2 py-0.5 text-xs font-medium text-silver" dir="ltr">
-                      {t.aboutVersion}: v{version}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <div className="inline-block rounded-md border border-line bg-panel px-2 py-0.5 text-xs font-medium text-silver" dir="ltr">
+                        {t.aboutVersion}: v{version}
+                      </div>
+                      <button
+                        type="button"
+                        data-testid="check-updates-btn"
+                        disabled={updateState?.status === 'checking' || updateState?.status === 'downloading'}
+                        onClick={() => { void onCheckForUpdates?.(); }}
+                        className="rounded-md border border-line bg-panel2 px-2.5 py-0.5 text-xs text-fg hover:border-silver disabled:opacity-50"
+                      >
+                        {updateState?.status === 'checking' ? t.checkingUpdates : t.checkForUpdates}
+                      </button>
+                      {updateState?.status === 'available' && (
+                        <button
+                          type="button"
+                          data-testid="settings-update-now-btn"
+                          onClick={() => { void onUpdateNow?.(); }}
+                          className="rounded-md bg-emerald-500 px-2.5 py-0.5 text-xs font-medium text-slate-950 hover:bg-emerald-400"
+                        >
+                          ⬆ {t.updateNow} (v{updateState.latestVersion})
+                        </button>
+                      )}
                     </div>
+                    {updateState && updateState.status !== 'idle' && (
+                      <div data-testid="settings-update-status" className="mt-1.5 text-[11px] text-silver">
+                        {updateState.status === 'checking' && t.checkingUpdates}
+                        {updateState.status === 'up-to-date' && `✓ ${t.upToDate}`}
+                        {updateState.status === 'available' && `✨ ${t.updateAvailable}: v${updateState.latestVersion}`}
+                        {updateState.status === 'downloading' && `${t.downloadingUpdate} ${updateState.downloadProgress ?? 0}%`}
+                        {updateState.status === 'ready' && `✓ ${t.updateReadyLaunching}`}
+                        {updateState.status === 'error' && `${t.updateError}${updateState.error ? `: ${updateState.error}` : ''}`}
+                      </div>
+                    )}
                   </div>
                 </div>
 

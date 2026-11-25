@@ -1,7 +1,7 @@
 {
   "name": "nbrsflow",
   "productName": "nbrsflow",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Windows desktop app combining an aria2 download manager with a smart file explorer.",
   "author": "nbrs",
   "license": "MIT",

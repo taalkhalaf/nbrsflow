@@ -1,6 +1,7 @@
 // Automated checks for the metadata store (relative keys, rename/move sync) and auto-color rule.
 // Usage: npm run test:meta   (compiles electron/ first)
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -13,6 +14,7 @@ const {
   clearGpuCrashFlag,
   buildRecoveryDataUrl
 } = require('../dist-electron/electron/windowRecovery.js');
+const { AppUpdater, compareSemver, parseGithubRelease } = require('../dist-electron/electron/appUpdater.js');
 
 const ROOT = 'D:\\Ai\\antigravity\\nbrsflow_downloads_test';
 const defaults = { language: 'ar', downloadDir: ROOT, autoColor: false };
@@ -267,6 +269,58 @@ const ok = (n) => { passed++; console.log('  ok -', n); };
     assert.equal(fs.existsSync(path.join(repoRoot, 'CHANGELOG.md')), true);
     assert.equal(fs.existsSync(path.join(repoRoot, 'LICENSE')), true);
     ok('MetadataStore folder tags (preset, custom, moveKey, clear) and GitHub repo files verified');
+
+    // appUpdater: semver comparison, GitHub release parsing, checkForUpdates, and downloadAndInstall
+    assert.equal(compareSemver('v0.2.11', '0.2.10') > 0, true);
+    assert.equal(compareSemver('0.2.11', 'v0.2.11'), 0);
+    assert.equal(compareSemver('0.2.9', '0.2.11') < 0, true);
+
+    const updTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nbrs-upd-'));
+    let launchedInstallerPath = '';
+    const mockSrv = http.createServer((req, res) => {
+      if (req.url === '/repos/taalkhalaf/nbrsflow/releases/latest') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          tag_name: 'v0.9.0',
+          html_url: 'https://github.com/taalkhalaf/nbrsflow/releases/tag/v0.9.0',
+          body: 'New features & fixes',
+          assets: [{
+            name: 'nbrsflow-setup-0.9.0.exe',
+            browser_download_url: `http://127.0.0.1:${mockSrv.address().port}/download/nbrsflow-setup-0.9.0.exe`
+          }]
+        }));
+        return;
+      }
+      if (req.url === '/download/nbrsflow-setup-0.9.0.exe') {
+        const buf = Buffer.from('MZ-mock-installer');
+        res.setHeader('Content-Length', String(buf.length));
+        res.end(buf);
+        return;
+      }
+      res.statusCode = 404;
+      res.end();
+    });
+    await new Promise((r) => mockSrv.listen(0, '127.0.0.1', r));
+    try {
+      const updater = new AppUpdater({
+        currentVersion: '0.2.11',
+        apiBaseUrl: `http://127.0.0.1:${mockSrv.address().port}`,
+        downloadDir: updTmp,
+        launchInstaller: (p) => { launchedInstallerPath = p; }
+      });
+      const stCheck = await updater.checkForUpdates();
+      assert.equal(stCheck.status, 'available');
+      assert.equal(stCheck.latestVersion, '0.9.0');
+      assert.equal(stCheck.assetName, 'nbrsflow-setup-0.9.0.exe');
+      const stDl = await updater.downloadAndInstall();
+      assert.equal(stDl.status, 'ready');
+      assert.equal(fs.existsSync(launchedInstallerPath), true);
+      assert.equal(parseGithubRelease({ tag_name: 'v0.2.11', assets: [] }, '0.2.11').available, false);
+    } finally {
+      mockSrv.close();
+      fs.rmSync(updTmp, { recursive: true, force: true });
+    }
+    ok('AppUpdater detects newer GitHub release, downloads installer, and invokes launchInstaller');
 
     console.log(`\nALL PASSED (${passed} checks)`);
   } finally {

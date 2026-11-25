@@ -52,7 +52,7 @@
   - [x] Live file watcher (`fs.watch` recursive, debounced) refreshing the explorer and the folder tree.
   - [x] Drag & drop to tree folders, explorer folders, and between dual panes with drop highlight; context menu (AR/EN); keyboard shortcuts (F2, Delete, Enter, Backspace, Ctrl+A, First-Letter Cycling AR/EN).
   - [x] Security: every path validated against the root incl. symlink/junction escape and zip-slip; automated tests (`npm run test:fs`, `npm run test:e2e`).
-  - [x] New / Resume Marker (`openedAt`, `lastOpenedChildRelPath`, `unopenedFiles` in `MetadataStore`) with `New` / `Last opened` badges, smart folder indicators (`!` duplicate badge via `inspectFolderIndicators` & new/unopened dot badge) in `ExplorerPane`, and mark/reset Context Menu actions.
+  - [x] New / Resume Marker (`openedAt`, `lastOpenedChildRelPath`, `unopenedFiles` in `MetadataStore`) with `New` / `Last opened` badges, smart folder textual badges (`مكتمل` / `Complete`, `محدّث` / `Updated` clearing on open, `!` duplicate indicator) in `ExplorerPane`, and mark/reset Context Menu actions.
   - [x] Streaming Checksum Verification (`computeFileHashes` SHA-256 & MD5 + `ChecksumDialog.tsx` with quick copy & reference comparison).
   - [x] Disk Space Guard (`checkDiskSpace`, configurable `minFreeDiskSpaceBytes` defaulting to 2 GB, live warnings in `StatusBar` and `DownloadsPanel`).
   - [x] Virtualized lists & grid rendering for large folders (`ExplorerPane.tsx`).
@@ -90,5 +90,6 @@
 - [x] **Phase 12: Production Packaging, Windows Installer & GitHub Release** (Windows x64 NSIS, unpacked `.exe` & official brand `.ico` built & verified; GitHub Actions deferred)
   - [x] Configure `electron-builder` for Windows x64 (`nsis`) with `extraResources` bundling `resources/bin/win32/aria2c.exe`, `extension/`, and `resources/brand/`.
   - [x] Build unpacked executable (`release\win-unpacked\nbrsflow.exe`) and NSIS installer (`release\nbrsflow-setup-0.2.9.exe`), verified in packaged mode (`app.isPackaged === true`).
-  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (Git repo initialized on `main`, `origin` linked to `https://github.com/taalkhalaf/nbrsflow.git`, committed `Release v0.2.10`; awaiting GitHub authentication for `git push -u origin main`).
+  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (Git repo initialized on `main`, `origin` linked to `https://github.com/taalkhalaf/nbrsflow.git`, committed `Release v0.2.11`).
+  - [x] In-app GitHub Releases update checker & one-click auto-updater (`electron/appUpdater.ts`, `TopBar.tsx`, `SettingsDialog.tsx`, `App.tsx`).
   - [x] Integrate official `nbrsflow_brand_package` `.ico`/`.png` application, tray, extension, and NSIS installer icons (GitHub Actions automated release workflow deferred).

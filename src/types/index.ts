@@ -41,6 +41,20 @@ export interface ExtensionDownloadNotice {
   deduplicated?: boolean;
 }
 
+export interface UpdateState {
+  status: 'idle' | 'checking' | 'available' | 'up-to-date' | 'downloading' | 'ready' | 'error';
+  currentVersion: string;
+  latestVersion?: string;
+  releaseNotes?: string;
+  releaseUrl?: string;
+  assetUrl?: string;
+  assetName?: string;
+  downloadProgress?: number;
+  downloadedPath?: string;
+  error?: string;
+  checkedAt?: number;
+}
+
 export interface NbrsAPI {
   version: string;
   platform: string;
@@ -127,5 +141,11 @@ export interface NbrsAPI {
   };
   system: {
     sleep(): Promise<void>;
+  };
+  updater?: {
+    getState(): Promise<UpdateState>;
+    check(): Promise<UpdateState>;
+    downloadAndInstall(): Promise<UpdateState>;
+    onStateChange(cb: (state: UpdateState) => void): () => void;
   };
 }

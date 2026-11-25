@@ -2,6 +2,12 @@
 
 All notable changes to **nbrsflow** are documented in this file.
 
+## [0.2.11] - 2026-11-25
+### Added & Improved
+- **Textual Folder Badges (`مكتمل` & `محدّث`):** Replaced the small dot indicator with clear textual badges matching the `جديد`/`New` style: **`محدّث` / `Updated`** when a folder has newly added unopened files (clears automatically when opened) and **`مكتمل` / `Complete`** for completed `1..N` series, alongside the `!` duplicate indicator with descriptive reason tooltips.
+- **Redesigned Modern Folder Icon:** Rebuilt `FolderIcon.tsx` with layered SVG gradients, glass edge highlights, subtle ambient shadow, custom color support, and crisp embedded tag pills.
+- **In-App GitHub Update Checker & Auto-Updater:** Added `electron/appUpdater.ts` checking `taalkhalaf/nbrsflow` GitHub Releases on startup/periodically and on-demand from Settings -> About, with an in-app update banner, TopBar indicator, active-download warning, and one-click **"Update Now"** installer download & launch.
+
 ## [0.2.10] - 2026-11-25
 ### Added
 - **TopBar View Mode Selector:** Instant switching between **Default**, **Downloads** (Download Manager only), and **Files** (File Manager only) modes with persistent settings and full AR/EN RTL/LTR support.

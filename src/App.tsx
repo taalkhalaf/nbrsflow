@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dict, type Lang } from './i18n';
-import type { Aria2EngineState, CategoryDirKey, ClipboardUrlSuggestion, ColorId, DiskSpaceWarning, DownloadItem, DuplicateCheckResult, FileEntry, ItemMeta, ViewMode } from './types';
+import type { Aria2EngineState, CategoryDirKey, ClipboardUrlSuggestion, ColorId, DiskSpaceWarning, DownloadItem, DuplicateCheckResult, FileEntry, ItemMeta, UpdateState, ViewMode } from './types';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import DownloadsPanel, { type DlTab } from './components/DownloadsPanel';
@@ -68,6 +68,8 @@ export default function App() {
   const [extensionPort, setExtensionPort] = useState(47832);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updateBannerDismissed, setUpdateBannerDismissed] = useState(false);
   const [thisPcOpen, setThisPcOpen] = useState(false);
   const [defaultDownloadDir, setDefaultDownloadDir] = useState('');
   const [categoryDirs, setCategoryDirs] = useState<Partial<Record<CategoryDirKey, string>>>({});
@@ -170,7 +172,12 @@ export default function App() {
     });
     api.windowCtrl?.isMaximized().then(setMaximized).catch(() => undefined);
     const unsubMax = api.windowCtrl?.onMaximizedChange(setMaximized);
-    return () => { unsubDl(); unsubDisk(); unsubClip(); unsubExt?.(); unsubAllDone?.(); unsubMax?.(); };
+    api.updater?.getState().then(setUpdateState).catch(() => undefined);
+    const unsubUpd = api.updater?.onStateChange((st) => {
+      setUpdateState(st);
+      if (st.status === 'available') setUpdateBannerDismissed(false);
+    });
+    return () => { unsubDl(); unsubDisk(); unsubClip(); unsubExt?.(); unsubAllDone?.(); unsubMax?.(); unsubUpd?.(); };
   }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadMeta(); }, [loadMeta, refreshKey]);
@@ -645,6 +652,26 @@ export default function App() {
     void api?.settings.set({ viewMode: mode });
   };
 
+  const checkForUpdates = async () => {
+    if (!api?.updater) return;
+    const st = await api.updater.check();
+    setUpdateState(st);
+    if (st.status === 'available') setUpdateBannerDismissed(false);
+  };
+
+  const triggerUpdateNow = async () => {
+    if (!api?.updater) return;
+    const hasActive = downloads.some((d) => d.status === 'active' || d.status === 'queued');
+    if (hasActive && !window.confirm(t.updateActiveDownloadsWarning)) return;
+    await api.updater.downloadAndInstall();
+  };
+
+  const showUpdateBanner = !updateBannerDismissed && (
+    updateState?.status === 'available' ||
+    updateState?.status === 'downloading' ||
+    updateState?.status === 'ready'
+  );
+
   return (
     <MetaContext.Provider value={metaCtx}>
     <div className="flex h-full flex-col">
@@ -656,6 +683,9 @@ export default function App() {
         clipboardMonitor={clipboardMonitor} showSidebar={showSidebar}
         maximized={maximized}
         canUndo={canUndo}
+        updateAvailable={updateState?.status === 'available'}
+        latestVersion={updateState?.latestVersion}
+        onOpenUpdate={() => setUpdateBannerDismissed(false)}
         onSearch={setSearch}
         onToggleSearchDownloads={() => setSearchDownloads((v) => !v)}
         onToggleSearchFiles={() => setSearchFiles((v) => !v)}
@@ -668,6 +698,40 @@ export default function App() {
         onWinMaximize={() => { void api?.windowCtrl?.toggleMaximize().then(setMaximized); }}
         onWinClose={() => { void api?.windowCtrl?.close(); }}
       />
+      {showUpdateBanner && updateState && (
+        <div
+          data-testid="update-banner"
+          className="flex items-center justify-between gap-3 border-b border-emerald-500/35 bg-emerald-500/10 px-4 py-1.5 text-xs text-emerald-200"
+        >
+          <div className="min-w-0 flex-1 truncate">
+            <span className="font-semibold">⬆ {t.updateAvailable}: v{updateState.latestVersion}</span>
+            {updateState.releaseNotes && (
+              <span className="ms-2 text-emerald-200/80">— {updateState.releaseNotes.split(/\r?\n/)[0]}</span>
+            )}
+            {updateState.status === 'downloading' && (
+              <span className="ms-2 font-medium text-emerald-300">({t.downloadingUpdate} {updateState.downloadProgress ?? 0}%)</span>
+            )}
+            {updateState.status === 'ready' && (
+              <span className="ms-2 font-medium text-emerald-300">({t.updateReadyLaunching})</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {updateState.status === 'available' && updateState.assetUrl && (
+              <button
+                type="button"
+                data-testid="update-now-btn"
+                onClick={() => { void triggerUpdateNow(); }}
+                className="rounded-md bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold text-slate-950 hover:bg-emerald-400"
+              >{t.updateNow}</button>
+            )}
+            <button
+              type="button"
+              onClick={() => setUpdateBannerDismissed(true)}
+              className="rounded-md px-1.5 py-0.5 text-emerald-300/80 hover:bg-emerald-500/20 hover:text-emerald-100"
+            >✕</button>
+          </div>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         {showSidebar && viewMode !== 'downloads' && (
           <Sidebar api={api} root={root} current={current} t={t} typeFilter={typeFilter} refreshKey={refreshKey}
@@ -800,6 +864,9 @@ export default function App() {
           onOpenExternalFolder={openExternalFolder}
           onOrganizeExternalFolder={organizeExternalFolder}
           onRestoreDefaults={restoreDefaults}
+          updateState={updateState}
+          onCheckForUpdates={checkForUpdates}
+          onUpdateNow={triggerUpdateNow}
           onClose={() => setSettingsOpen(false)}
         />
       )}

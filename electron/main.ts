@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { buildLoginItemOptions, sanitizeWindowsRunRegistry } from './startupHelper';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -10,6 +10,7 @@ import { Aria2Manager, classifyFileCategory, isWithinScheduleWindow, setDownload
 import { ClipboardMonitor } from './clipboardWatcher';
 import { DEFAULT_EXTENSION_PORT, ExtensionBridgeServer, normalizeExtensionPort } from './extensionBridge';
 import { TrayManager } from './trayManager';
+import { AppUpdater } from './appUpdater';
 import {
   buildRecoveryDataUrl,
   clearGpuCrashFlag,
@@ -58,6 +59,7 @@ let aria2: Aria2Manager;
 let clipMonitor: ClipboardMonitor | null = null;
 let extensionBridge: ExtensionBridgeServer | null = null;
 let trayManager: TrayManager | null = null;
+let updater: AppUpdater | null = null;
 
 function resolveExtensionPath(): string {
   return app.isPackaged
@@ -702,6 +704,9 @@ function registerIpc(): void {
       execFile('rundll32.exe', ['powrprof.dll,SetSuspendState', '0,1,0'], { windowsHide: true }, () => { /* ignore */ });
     }
   });
+  ipcMain.handle('updater:getState', () => updater?.getState() ?? { status: 'idle', currentVersion: APP_VERSION });
+  ipcMain.handle('updater:check', () => updater?.checkForUpdates() ?? { status: 'idle', currentVersion: APP_VERSION });
+  ipcMain.handle('updater:downloadAndInstall', () => updater?.downloadAndInstall() ?? { status: 'error', currentVersion: APP_VERSION });
 }
 
 let watcher: fs.FSWatcher | null = null;
@@ -1096,6 +1101,26 @@ if (!gotLock) {
       }
     );
     void clipMonitor.start();
+    updater = new AppUpdater({
+      currentVersion: APP_VERSION,
+      repo: 'taalkhalaf/nbrsflow',
+      apiBaseUrl: process.env.NBRS_UPDATE_API_URL || undefined,
+      downloadDir: path.join(app.getPath('temp'), 'nbrsflow-updates'),
+      onStateChange: (state) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('updater:state', state);
+        }
+      },
+      launchInstaller: (installerPath) => {
+        if (process.env.NBRS_E2E === '1') return;
+        isQuitting = true;
+        spawn(installerPath, [], { detached: true, stdio: 'ignore' }).unref();
+        setTimeout(() => { app.quit(); }, 300);
+      }
+    });
+    if (process.env.NBRS_E2E !== '1' && process.env.NBRS_DISABLE_AUTO_UPDATE !== '1') {
+      updater.startPeriodicCheck();
+    }
     const diskTimer = setInterval(() => {
       void aria2.checkDiskSpace().catch(() => undefined);
       const s = store.getSettings();
@@ -1106,7 +1131,7 @@ if (!gotLock) {
         else void aria2.pauseAllForSchedule();
       }
     }, 30000);
-    app.on('before-quit', () => { clearInterval(diskTimer); clipMonitor?.stop(); });
+    app.on('before-quit', () => { clearInterval(diskTimer); clipMonitor?.stop(); updater?.stop(); });
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
 

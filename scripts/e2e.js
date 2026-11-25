@@ -618,6 +618,27 @@ async function waitFor(fn, label, timeout = 15000) {
     await waitFor(() => ev(`document.querySelector('[data-testid="toggle-auto-move-completed"]')?.getAttribute('aria-checked') === 'false' && document.querySelector('[data-testid="toggle-group-by-tag"]')?.getAttribute('aria-checked') === 'false'`), 'autoMoveCompleted and groupByTag default to false');
     await ev(`document.querySelector('[data-testid="settings-close-btn"]').click()`);
     ok('Auto-move completed & Group-by-tag settings defaults (false) verified');
+
+    // Textual folder "Updated" (محدّث) badge + auto-clear on markOpened + Settings -> About update check button
+    const updFolder = path.join(base, 'UpdatedSeriesE2E');
+    const updEp1 = path.join(updFolder, 'ep1.mp4');
+    fs.mkdirSync(updFolder, { recursive: true });
+    fs.writeFileSync(updEp1, 'video');
+    await waitFor(() => ev(`window.__t.names().includes('UpdatedSeriesE2E')`), 'UpdatedSeriesE2E visible');
+    const dlUpd = await ev(`window.nbrsAPI.downloads.add('http://127.0.0.1:${dlPort}/ep2.mp4', ${JSON.stringify(updFolder)})`);
+    await waitFor(() => fs.existsSync(path.join(updFolder, 'ep2.mp4')), 'ep2.mp4 downloaded into UpdatedSeriesE2E');
+    await waitFor(() => ev(`!!window.__t.item('UpdatedSeriesE2E')?.querySelector('[data-testid="folder-updated-badge"]')`), 'folder-updated-badge shown');
+    await ev(`window.nbrsAPI.metadata.markOpened(${JSON.stringify(path.join(updFolder, 'ep2.mp4'))})`);
+    await waitFor(() => ev(`!window.__t.item('UpdatedSeriesE2E')?.querySelector('[data-testid="folder-updated-badge"]')`), 'folder-updated-badge cleared after markOpened');
+    await ev(`window.nbrsAPI.downloads.cancel(${JSON.stringify(dlUpd.id)}, true)`);
+    fs.rmSync(updFolder, { recursive: true, force: true });
+
+    await ev(`document.querySelector('[data-testid="settings-btn"]').click()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="settings-dialog"]')`), 'settings dialog opened for About update check');
+    await ev(`document.querySelector('[data-testid="settings-tab-about"]').click()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="check-updates-btn"]')`), 'check-updates-btn visible');
+    await ev(`document.querySelector('[data-testid="settings-close-btn"]').click()`);
+    ok('Textual folder Updated (محدّث) badge auto-clear and About update checker UI verified');
   } finally {
     dlSrv.close();
     fs.rmSync(path.join(ROOT, 'E2E Auto Series'), { recursive: true, force: true });

@@ -19,6 +19,9 @@ interface Props {
   showSidebar: boolean;
   maximized: boolean;
   canUndo: boolean;
+  updateAvailable?: boolean;
+  latestVersion?: string;
+  onOpenUpdate?: () => void;
   onSearch: (s: string) => void;
   onToggleSearchDownloads: () => void;
   onToggleSearchFiles: () => void;
@@ -51,6 +54,17 @@ export default function TopBar(p: Props) {
         <span data-testid="app-version" className="rounded-md border border-line bg-bg px-1.5 py-0.5 text-[11px] font-medium text-muted">
           v{p.version}
         </span>
+        {p.updateAvailable && (
+          <button
+            type="button"
+            data-testid="topbar-update-badge"
+            onClick={p.onOpenUpdate}
+            title={`${t.updateAvailable}: v${p.latestVersion ?? ''}`}
+            className="no-drag rounded-md border border-emerald-500/45 bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/25"
+          >
+            ⬆ v{p.latestVersion}
+          </button>
+        )}
       </div>
 
       <div className="no-drag relative flex min-w-0 flex-1 max-w-lg items-center gap-1.5">
