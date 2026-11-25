@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--c-bg);
+  --color-panel: var(--c-panel);
+  --color-panel2: var(--c-panel2);
+  --color-line: var(--c-line);
+  --color-fg: var(--c-fg);
+  --color-muted: var(--c-muted);
+  --color-silver: var(--c-silver);
+  --color-accent: var(--c-accent);
+  --color-accentfg: var(--c-accentfg);
+}
+
+:root, .dark {
+  --c-bg: #0B0E13;
+  --c-panel: #171C23;
+  --c-panel2: #222831;
+  --c-line: #3B434D;
+  --c-fg: #F2F3F5;
+  --c-muted: #AEB5BE;
+  --c-silver: #D6D9DE;
+  --c-accent: #D6D9DE;
+  --c-accentfg: #0B0E13;
+  color-scheme: dark;
+}
+
+.light {
+  --c-bg: #F2F3F5;
+  --c-panel: #FFFFFF;
+  --c-panel2: #E6E9EE;
+  --c-line: #CFD5DE;
+  --c-fg: #0B0E13;
+  --c-muted: #4E5663;
+  --c-silver: #222831;
+  --c-accent: #171C23;
+  --c-accentfg: #F2F3F5;
+  color-scheme: light;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  font-weight: 400;
+  user-select: none;
+}
+
+html[lang="ar"] body {
+  font-family: "Tajawal", "Segoe UI", Tahoma, system-ui, sans-serif;
+}
+
+button, a, input, select, textarea {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+input, textarea { user-select: text; }
+
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-line); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-muted); }

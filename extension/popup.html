@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>nbrsflow</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e13;
+      --panel: #171c23;
+      --panel2: #222831;
+      --line: #2d3440;
+      --fg: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #e5e7eb;
+      --accent-fg: #0b0e13;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 332px;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 13px;
+      padding: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .lang-btn {
+      background: var(--panel2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--ok); }
+    .dot.err { background: var(--err); }
+    .switch {
+      position: relative;
+      width: 42px;
+      height: 22px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .switch[aria-checked="true"] {
+      background: var(--accent);
+    }
+    .switch-knob {
+      display: block;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: var(--muted);
+      transform: translateX(-2px);
+      transition: transform 0.15s ease;
+    }
+    html[dir="ltr"] .switch-knob { transform: translateX(2px); }
+    .switch[aria-checked="true"] .switch-knob {
+      background: var(--accent-fg);
+      transform: translateX(-22px);
+    }
+    html[dir="ltr"] .switch[aria-checked="true"] .switch-knob {
+      transform: translateX(22px);
+    }
+    .muted { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .port-row { display: flex; gap: 6px; margin-top: 8px; }
+    input[type="number"], input[type="url"] {
+      width: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      direction: ltr;
+    }
+    .btn {
+      background: var(--panel2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--fg); }
+    .btn.primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .notice {
+      font-size: 11px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      word-break: break-word;
+    }
+    .notice.ok { border-color: rgba(16, 185, 129, 0.4); }
+    .notice.fallback { border-color: rgba(245, 158, 11, 0.5); color: var(--warn); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <img src="icons/icon48.png" width="18" height="18" alt="nbrsflow" />
+      <span>nbrsflow</span>
+    </div>
+    <button id="langBtn" class="lang-btn" type="button">English</button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="status-pill">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusText">…</span>
+      </div>
+      <button id="refreshBtn" class="btn" type="button">↻</button>
+    </div>
+    <div id="statusSub" class="muted"></div>
+  </div>
+
+  <div class="card">
+    <div id="sendUrlLabel" style="font-weight:600;font-size:12px;"></div>
+    <div class="port-row">
+      <input id="directUrlInput" type="url" placeholder="https://..." />
+      <button id="sendUrlBtn" class="btn primary" type="button"></button>
+    </div>
+    <div class="port-row" style="margin-top:6px;">
+      <button id="capturePageBtn" class="btn" style="width:100%;" type="button"></button>
+    </div>
+    <div id="capturedLinksBox" style="display:none;margin-top:8px;max-height:110px;overflow:auto;"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <div id="interceptTitle" style="font-weight:600;"></div>
+        <div id="interceptDesc" class="muted"></div>
+      </div>
+      <button id="toggleBtn" class="switch" type="button" role="switch" aria-checked="true">
+        <span class="switch-knob"></span>
+      </button>
+    </div>
+    <div class="row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+      <div>
+        <div id="confirmTitle" style="font-weight:600;"></div>
+        <div id="confirmDesc" class="muted"></div>
+      </div>
+      <button id="confirmToggleBtn" class="switch" type="button" role="switch" aria-checked="false">
+        <span class="switch-knob"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="portLabel" style="font-weight:600;font-size:12px;"></div>
+    <div class="port-row">
+      <input id="portInput" type="number" min="1024" max="65535" value="47832" />
+      <button id="savePortBtn" class="btn" type="button"></button>
+    </div>
+    <div id="excludedLabel" style="font-weight:600;font-size:12px;margin-top:8px;"></div>
+    <div class="port-row">
+      <input id="excludedInput" type="url" placeholder="example.com, cdn.local" />
+      <button id="saveExcludedBtn" class="btn" type="button"></button>
+    </div>
+  </div>
+
+  <div id="noticeBox" class="notice" style="display:none;"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

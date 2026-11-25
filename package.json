@@ -1,0 +1,98 @@
+{
+  "name": "nbrsflow",
+  "productName": "nbrsflow",
+  "version": "0.2.10",
+  "description": "Windows desktop app combining an aria2 download manager with a smart file explorer.",
+  "author": "nbrs",
+  "license": "MIT",
+  "private": true,
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "predev": "node scripts/ensure-electron.js",
+    "start": "npm run dev",
+    "test:e2e": "node scripts/e2e.js",
+    "test:ext": "npm run build:electron && node scripts/test-extension.js",
+    "test:seq": "npm run build:electron && node scripts/test-sequence.js",
+    "test:aria2": "npm run build:electron && node scripts/test-aria2.js",
+    "test:meta": "npm run build:electron && node scripts/test-metadata.js",
+    "test:fs": "npm run build:electron && node scripts/test-fsops.js",
+    "dev": "concurrently -k -n vite,tsc,electron -c cyan,yellow,green \"vite\" \"tsc -p electron/tsconfig.json -w --preserveWatchOutput\" \"wait-on tcp:5173 dist-electron/electron/main.js dist-electron/electron/preload.js && electron .\"",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build": "npm run typecheck && vite build && npm run build:electron",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
+    "dist": "npm run build && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "io.github.nbrs.nbrsflow",
+    "productName": "nbrsflow",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin/win32",
+        "to": "bin/win32",
+        "filter": [
+          "aria2c.exe",
+          "README.md"
+        ]
+      },
+      {
+        "from": "extension",
+        "to": "extension"
+      },
+      {
+        "from": "resources/brand",
+        "to": "brand"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "include": "build/installer.nsh",
+      "artifactName": "nbrsflow-setup-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "wait-on": "^9.5.1"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/tajawal": "^5.3.0",
+    "adm-zip": "^0.6.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

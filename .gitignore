@@ -1,0 +1,67 @@
+# Node & Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Production & Packaging Builds
+dist/
+build/
+out/
+release/
+*.exe
+*.msi
+*.zip
+*.tar.gz
+
+# Environment & Local Secrets
+.env
+.env.local
+.env.*.local
+
+# Vite / Bundler caches
+.vite/
+.parcel-cache/
+
+# SQLite & Local Databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Test Downloads & User Data
+nbrsflow_downloads_test/
+downloads/
+temp/
+tmp/
+
+# Operating System Files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# IDE & Editor Directories
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Compiled Electron main/preload
+dist-electron/
+*.log

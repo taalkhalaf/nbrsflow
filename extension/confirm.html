@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>nbrsflow</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e13;
+      --panel: #171c23;
+      --panel2: #222831;
+      --line: #2d3440;
+      --fg: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #e5e7eb;
+      --accent-fg: #0b0e13;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 13px;
+      padding: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+    .file { font-weight: 600; word-break: break-word; margin-bottom: 4px; }
+    .url { color: var(--muted); font-size: 11px; word-break: break-all; max-height: 48px; overflow: hidden; direction: ltr; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .btn {
+      background: var(--panel2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="titleEl" class="title"></div>
+    <div id="fileEl" class="file"></div>
+    <div id="urlEl" class="url"></div>
+    <div class="actions">
+      <button id="browserBtn" class="btn" type="button"></button>
+      <button id="sendBtn" class="btn primary" type="button"></button>
+    </div>
+  </div>
+  <script src="confirm.js"></script>
+</body>
+</html>
