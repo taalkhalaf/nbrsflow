@@ -3,10 +3,18 @@
 > **Modern Windows Download Manager & Intelligent File Explorer**  
 > **تطبيق سطح مكتب لويندوز يجمع بين مدير التحميلات عالي السرعة (`aria2`) ومستعرض الملفات الذكي.**
 
-[![Version](https://img.shields.io/badge/Version-0.2.10-D6D9DE.svg?labelColor=171C23&color=3B434D)]()
+[![Version](https://img.shields.io/badge/Version-0.2.11-D6D9DE.svg?labelColor=171C23&color=3B434D)](https://github.com/taalkhalaf/nbrsflow/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D6.svg)]()
 [![Author](https://img.shields.io/badge/Author-nbrs-green.svg)]()
+
+---
+
+## Download | التحميل المباشر (Windows x64)
+
+- **التحميل المباشر لآخر إصدار (`v0.2.11`):** [**nbrsflow-setup-0.2.11.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.11.exe)
+- **صفحة الإصدارات الرسمية:** [GitHub Releases (Latest)](https://github.com/taalkhalaf/nbrsflow/releases/latest)
+- **Direct Download (`v0.2.11` Installer):** [**nbrsflow-setup-0.2.11.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.11.exe) | [All Releases](https://github.com/taalkhalaf/nbrsflow/releases/latest)
 
 ---
 
@@ -81,7 +89,7 @@ npm run build        # Build renderer (dist/) and Electron main/preload (dist-el
 npm run dist         # Package Windows x64 installer & unpacked app into release/
 ```
 Generated artifacts in `release/` (git-ignored):
-- `release/nbrsflow-setup-0.2.10.exe` (NSIS Windows installer)
+- `release/nbrsflow-setup-0.2.11.exe` (NSIS Windows installer)
 - `release/win-unpacked/nbrsflow.exe` (Portable unpacked executable with bundled `resources/bin/win32/aria2c.exe`)
 
 ### Third-Party Licenses | تراخيص الطرف الثالث
