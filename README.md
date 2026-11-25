@@ -3,7 +3,7 @@
 > **Modern Windows Download Manager & Intelligent File Explorer**  
 > **تطبيق سطح مكتب لويندوز يجمع بين مدير التحميلات عالي السرعة (`aria2`) ومستعرض الملفات الذكي.**
 
-[![Version](https://img.shields.io/badge/Version-0.2.11-D6D9DE.svg?labelColor=171C23&color=3B434D)](https://github.com/taalkhalaf/nbrsflow/releases/latest)
+[![Version](https://img.shields.io/badge/Version-0.2.12-D6D9DE.svg?labelColor=171C23&color=3B434D)](https://github.com/taalkhalaf/nbrsflow/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D6.svg)]()
 [![Author](https://img.shields.io/badge/Author-nbrs-green.svg)]()
@@ -12,9 +12,9 @@
 
 ## Download | التحميل المباشر (Windows x64)
 
-- **التحميل المباشر لآخر إصدار (`v0.2.11`):** [**nbrsflow-setup-0.2.11.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.11.exe)
+- **التحميل المباشر لآخر إصدار (`v0.2.12`):** [**nbrsflow-setup-0.2.12.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.12.exe)
 - **صفحة الإصدارات الرسمية:** [GitHub Releases (Latest)](https://github.com/taalkhalaf/nbrsflow/releases/latest)
-- **Direct Download (`v0.2.11` Installer):** [**nbrsflow-setup-0.2.11.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.11.exe) | [All Releases](https://github.com/taalkhalaf/nbrsflow/releases/latest)
+- **Direct Download (`v0.2.12` Installer):** [**nbrsflow-setup-0.2.12.exe**](https://github.com/taalkhalaf/nbrsflow/releases/latest/download/nbrsflow-setup-0.2.12.exe) | [All Releases](https://github.com/taalkhalaf/nbrsflow/releases/latest)
 
 ---
 

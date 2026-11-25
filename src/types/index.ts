@@ -90,7 +90,9 @@ export interface NbrsAPI {
     revealInExplorer(itemPath: string): Promise<void>;
     calculateFolderSize(folderPath: string): Promise<number>;
     inspectFolderIndicators(folderPaths: string[]): Promise<Record<string, FolderIndicator>>;
-    smartExtractArchive(archivePath: string): Promise<string>;
+    smartExtractArchive(archivePath: string, mode?: 'folder' | 'here'): Promise<string>;
+    getThumbnail(itemPath: string): Promise<string | null>;
+    mergeToFolder(sources: string[], targetFile: string): Promise<string>;
     computeHashes(filePath: string): Promise<FileHashes>;
     organizeSequences(dir?: string): Promise<OrganizeResult>;
     pickFolder(): Promise<string | null>;

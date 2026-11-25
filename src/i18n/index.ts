@@ -302,7 +302,48 @@ const en = {
   deletedN: 'Moved to Recycle Bin',
   extracted: 'Extracted',
   renamed: 'Renamed',
-  dropHere: 'Drop here to move',  status: { queued: 'Queued', active: 'Downloading', paused: 'Paused', completed: 'Completed', error: 'Failed', removed: 'Removed' }
+  dropHere: 'Drop here to move',
+  // Setup Wizard
+  setupWizardTitle: 'Welcome to nbrsflow',
+  setupWizardDesc: 'Configure your main workspace, default view, and core behavior in seconds.',
+  setupMainFolder: 'Main Downloads & Files Folder',
+  setupMainFolderHint: 'All downloads and organized folders will live here. It will be created automatically if missing.',
+  setupViewMode: 'Default Interface Mode',
+  setupCoreOptions: 'Core Features & Automation',
+  setupAutoCheckUpdates: 'Automatic update checks',
+  setupAutoCheckUpdatesDesc: 'Notify when a newer version is released on GitHub.',
+  setupFinish: 'Save & Start',
+  setupReopen: 'Reopen Setup Wizard',
+  setupSaved: 'Setup saved',
+  // Free-form tags
+  tagEmptyHint: 'Type any custom tag below (e.g. Series, Movie, Anime) to create and reuse it.',
+  tagYourTags: 'Your tags',
+  // Archives & Extract
+  extractToFolder: 'Extract to folder',
+  extractHereCurrent: 'Extract here',
+  afterExtractLabel: 'After archive extraction',
+  afterExtractKeep: 'Keep archive',
+  afterExtractTrash: 'Move archive to Recycle Bin',
+  afterExtractMove: 'Move archive to Archives folder',
+  // Explorer views, sort, group & quick actions
+  contentView: 'Content view',
+  sortBy: 'Sort',
+  sortName: 'Name',
+  sortModified: 'Date modified',
+  sortSize: 'Size',
+  sortType: 'Type',
+  groupBy: 'Group',
+  groupNone: 'None',
+  groupType: 'By type',
+  groupTag: 'By tag',
+  selectedCount: 'selected',
+  openLocation: 'Open location',
+  // Drag-to-merge
+  dragMergeSetting: 'Drag item onto another to create folder',
+  dragMergeSettingDesc: 'Android-style folder merging when dropping an item onto a file (off by default).',
+  dragMergeTip: 'Merge into new folder',
+  mergedIntoFolder: 'Merged into new folder',
+  status: { queued: 'Queued', active: 'Downloading', paused: 'Paused', completed: 'Completed', error: 'Failed', removed: 'Removed' }
 };
 
 export type Dict = typeof en;
@@ -609,7 +650,48 @@ const ar: Dict = {
   deletedN: 'تم النقل إلى السلة',
   extracted: 'تم فك الضغط',
   renamed: 'تمت إعادة التسمية',
-  dropHere: 'أفلت هنا للنقل',  status: { queued: 'في الانتظار', active: 'جاري التحميل', paused: 'متوقف', completed: 'مكتمل', error: 'فشل', removed: 'محذوف' }
+  dropHere: 'أفلت هنا للنقل',
+  // Setup Wizard
+  setupWizardTitle: 'مرحباً بك في nbrsflow',
+  setupWizardDesc: 'اضبط المجلد الرئيسي ووضع الواجهة والخواص الأساسية في ثوانٍ.',
+  setupMainFolder: 'المجلد الرئيسي للتحميلات والملفات',
+  setupMainFolderHint: 'تُحفظ فيه جميع التحميلات والمجلدات المنظّمة، وسيُنشأ تلقائياً إذا لم يكن موجوداً.',
+  setupViewMode: 'الوضع الافتراضي للواجهة',
+  setupCoreOptions: 'الخواص الأساسية والتنظيم التلقائي',
+  setupAutoCheckUpdates: 'التنبيه والتحديث التلقائي',
+  setupAutoCheckUpdatesDesc: 'التحقق الهادئ من وجود إصدار أحدث على GitHub.',
+  setupFinish: 'حفظ والبدء',
+  setupReopen: 'إعادة فتح معالج الإعداد الأولي',
+  setupSaved: 'تم حفظ الإعداد الأولي',
+  // Free-form tags
+  tagEmptyHint: 'اكتب أي تصنيف تريده بالأسفل (مثل: مسلسل، فيلم، أنمي) لحفظه وإعادة استخدامه.',
+  tagYourTags: 'تصنيفاتك',
+  // Archives & Extract
+  extractToFolder: 'فك الضغط إلى مجلد',
+  extractHereCurrent: 'فك الضغط هنا',
+  afterExtractLabel: 'بعد فك ضغط الأرشيف',
+  afterExtractKeep: 'الإبقاء على الأرشيف',
+  afterExtractTrash: 'نقل الأرشيف إلى سلة المحذوفات',
+  afterExtractMove: 'نقل الأرشيف إلى مجلد الأرشيف',
+  // Explorer views, sort, group & quick actions
+  contentView: 'عرض المحتوى',
+  sortBy: 'فرز',
+  sortName: 'الاسم',
+  sortModified: 'تاريخ التعديل',
+  sortSize: 'الحجم',
+  sortType: 'النوع',
+  groupBy: 'تجميع',
+  groupNone: 'بدون',
+  groupType: 'حسب النوع',
+  groupTag: 'حسب التصنيف',
+  selectedCount: 'محدد',
+  openLocation: 'فتح الموقع',
+  // Drag-to-merge
+  dragMergeSetting: 'سحب عنصر فوق عنصر آخر لإنشاء مجلد',
+  dragMergeSettingDesc: 'دمج العناصر في مجلد جديد عند السحب والإفلات فوق ملف آخر (معطّل افتراضياً).',
+  dragMergeTip: 'إنشاء مجلد مجمّع',
+  mergedIntoFolder: 'تم التجميع في مجلد جديد',
+  status: { queued: 'في الانتظار', active: 'جاري التحميل', paused: 'متوقف', completed: 'مكتمل', error: 'فشل', removed: 'محذوف' }
 };
 
 export const dict: Record<Lang, Dict> = { en, ar };

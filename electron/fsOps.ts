@@ -1,9 +1,14 @@
+import { execFile } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { promisify } from 'node:util';
 import AdmZip from 'adm-zip';
 import type { DownloadProvenance, FileHashes, FilePreviewResult, FolderIndicator } from '../src/types/files';
 import { inspectSeriesCompletion } from './sequenceOrganizer';
+
+const execFileAsync = promisify(execFile);
+export const SUPPORTED_ARCHIVE_EXTS = new Set(['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tgz']);
 
 /** Pure filesystem operations. Every path is validated against `root`. */
 
@@ -176,47 +181,102 @@ export async function inspectFolderIndicators(
   return out;
 }
 
+function archiveBaseName(archivePath: string): string {
+  const base = path.basename(archivePath);
+  return base.replace(/\.tar\.(?:gz|bz2|xz)$/i, '').replace(/\.[^.]+$/, '') || 'extracted';
+}
+
+async function listTarEntries(archivePath: string): Promise<string[]> {
+  const { stdout } = await execFileAsync('tar', ['-tf', archivePath], {
+    timeout: 15000,
+    maxBuffer: 8 * 1024 * 1024
+  });
+  return stdout
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && l !== './' && l !== '.');
+}
+
 /**
- * Extract a .zip. One top-level item -> extracted next to the archive.
- * Several top-level items -> extracted into a new folder named after the archive.
- * Returns the path of the extracted item/folder.
+ * Extract an archive (.zip via AdmZip, or .rar/.7z/.tar/.gz/.bz2/.xz/.tgz via Windows bsdtar).
+ * mode:
+ * - 'smart': 1 top-level item -> next to archive; multiple -> folder named after archive.
+ * - 'folder': always extract into a new folder named after the archive.
+ * - 'here': extract directly into the archive's parent directory.
  */
-export async function smartExtractArchive(root: string, archivePath: string): Promise<string> {
+export async function smartExtractArchive(
+  root: string,
+  archivePath: string,
+  mode: 'smart' | 'folder' | 'here' = 'smart'
+): Promise<string> {
   const archive = resolveInside(root, archivePath);
-  if (path.extname(archive).toLowerCase() !== '.zip') throw new Error('Only .zip archives are supported');
-  const zip = new AdmZip(archive);
-  const entries = zip.getEntries().filter((e) => e.entryName.replace(/\\/g, '/').replace(/^\.\//, '') !== '');
-  if (entries.length === 0) throw new Error('Archive is empty');
-
-  const norm = (n: string) => n.replace(/\\/g, '/').replace(/\/+$/, '');
-  const topLevel = new Set(entries.map((e) => norm(e.entryName).split('/')[0]));
-  const parent = path.dirname(archive);
-  const single = topLevel.size === 1;
-  const outDir = single ? parent : uniquePath(parent, path.basename(archive, path.extname(archive)));
-  if (!single) await fs.promises.mkdir(outDir);
-
-  // If extracting directly, give the single top-level item a unique name instead of overwriting.
-  const topName = [...topLevel][0];
-  const renamedTop = single ? path.basename(uniquePath(outDir, validateName(topName))) : topName;
-  const outRoot = path.resolve(outDir);
-
-  let total = 0;
-  const MAX_TOTAL = 50 * 1024 ** 3;
-  const MAX_ENTRY = 4 * 1024 ** 3;
-  for (const entry of entries) {
-    const parts = norm(entry.entryName).split('/');
-    if (single) parts[0] = renamedTop;
-    const dest = path.resolve(outRoot, ...parts);
-    if (!lexicallyInside(outRoot, dest) || dest === outRoot) throw new Error(`Unsafe path in archive: ${entry.entryName}`);
-    resolveInside(root, dest);
-    if (entry.isDirectory) { await fs.promises.mkdir(dest, { recursive: true }); continue; }
-    if (entry.header.size < 0 || entry.header.size > MAX_ENTRY) throw new Error('Archive entry is too large to extract');
-    total += entry.header.size;
-    if (total > MAX_TOTAL) throw new Error('Archive is too large to extract');
-    await fs.promises.mkdir(path.dirname(dest), { recursive: true });
-    await fs.promises.writeFile(dest, entry.getData(), { flag: 'wx' });
+  const ext = path.extname(archive).toLowerCase();
+  if (!SUPPORTED_ARCHIVE_EXTS.has(ext)) {
+    throw new Error(`Unsupported archive format: ${ext || 'unknown'}`);
   }
-  return single ? path.join(outDir, renamedTop) : outDir;
+
+  const parent = path.dirname(archive);
+  const norm = (n: string) => n.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+
+  if (ext === '.zip') {
+    const zip = new AdmZip(archive);
+    const entries = zip.getEntries().filter((e) => norm(e.entryName) !== '');
+    if (entries.length === 0) throw new Error('Archive is empty');
+
+    const topLevel = new Set(entries.map((e) => norm(e.entryName).split('/')[0]));
+    const single = mode === 'smart' && topLevel.size === 1;
+    const outDir =
+      mode === 'here' || single
+        ? parent
+        : uniquePath(parent, archiveBaseName(archive));
+    if (mode !== 'here' && !single) await fs.promises.mkdir(outDir, { recursive: true });
+
+    const topName = [...topLevel][0];
+    const renamedTop = single ? path.basename(uniquePath(outDir, validateName(topName))) : topName;
+    const outRoot = path.resolve(outDir);
+
+    let total = 0;
+    const MAX_TOTAL = 50 * 1024 ** 3;
+    const MAX_ENTRY = 4 * 1024 ** 3;
+    for (const entry of entries) {
+      const parts = norm(entry.entryName).split('/');
+      if (single) parts[0] = renamedTop;
+      const dest = path.resolve(outRoot, ...parts);
+      if (!lexicallyInside(outRoot, dest) || dest === outRoot) throw new Error(`Unsafe path in archive: ${entry.entryName}`);
+      resolveInside(root, dest);
+      if (entry.isDirectory) { await fs.promises.mkdir(dest, { recursive: true }); continue; }
+      if (entry.header.size < 0 || entry.header.size > MAX_ENTRY) throw new Error('Archive entry is too large to extract');
+      total += entry.header.size;
+      if (total > MAX_TOTAL) throw new Error('Archive is too large to extract');
+      await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+      if (mode === 'here') {
+        const safeDest = fs.existsSync(dest) ? uniquePath(path.dirname(dest), path.basename(dest)) : dest;
+        await fs.promises.writeFile(safeDest, entry.getData(), { flag: 'wx' });
+      } else {
+        await fs.promises.writeFile(dest, entry.getData(), { flag: 'wx' });
+      }
+    }
+    return single ? path.join(outDir, renamedTop) : outDir;
+  }
+
+  // Non-zip archives via Windows bsdtar (libarchive)
+  const rawList = await listTarEntries(archive);
+  if (rawList.length === 0) throw new Error('Archive is empty');
+  const outDir = mode === 'here' ? parent : uniquePath(parent, archiveBaseName(archive));
+  const outRoot = path.resolve(outDir);
+  for (const rawEntry of rawList) {
+    const clean = norm(rawEntry);
+    if (!clean) continue;
+    const parts = clean.split('/');
+    const dest = path.resolve(outRoot, ...parts);
+    if (!lexicallyInside(outRoot, dest) || dest === outRoot) {
+      throw new Error(`Unsafe path in archive: ${rawEntry}`);
+    }
+    resolveInside(root, dest);
+  }
+  if (mode !== 'here') await fs.promises.mkdir(outDir, { recursive: true });
+  await execFileAsync('tar', ['-xf', archive, '-C', outDir], { timeout: 120000 });
+  return outDir;
 }
 
 /**
@@ -323,8 +383,8 @@ export async function readFilePreview(
     }
   }
 
-  const MAX_ZIP_PREVIEW_BYTES = 256 * 1024 * 1024;
-  if (ext === '.zip' && st.size <= MAX_ZIP_PREVIEW_BYTES) {
+  const MAX_ARCHIVE_PREVIEW_BYTES = 512 * 1024 * 1024;
+  if (ext === '.zip' && st.size <= MAX_ARCHIVE_PREVIEW_BYTES) {
     try {
       const zip = new AdmZip(target);
       const rawEntries = zip.getEntries();
@@ -344,5 +404,83 @@ export async function readFilePreview(
     }
   }
 
+  if (SUPPORTED_ARCHIVE_EXTS.has(ext) && st.size <= MAX_ARCHIVE_PREVIEW_BYTES) {
+    try {
+      const listed = await listTarEntries(target);
+      const archiveEntries = listed.slice(0, 200).map((name) => ({
+        name,
+        isDirectory: name.endsWith('/'),
+        size: 0
+      }));
+      return {
+        ...base,
+        kind: 'archive',
+        archiveEntries,
+        archiveTotalCount: listed.length
+      };
+    } catch {
+      return base;
+    }
+  }
+
   return base;
+}
+
+async function readImageThumbnailDataUrl(imgPath: string): Promise<string | null> {
+  try {
+    const st = await fs.promises.stat(imgPath);
+    if (!st.isFile() || st.size === 0 || st.size > 10 * 1024 * 1024) return null;
+    const ext = path.extname(imgPath).toLowerCase();
+    const mime = PREVIEW_IMAGE_MIME[ext];
+    if (!mime) return null;
+
+    if (ext !== '.svg') {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const electron = require('electron') as { nativeImage?: { createFromPath: (p: string) => { isEmpty: () => boolean; resize: (opts: { width: number }) => { toDataURL: () => string } } } };
+        if (electron?.nativeImage) {
+          const img = electron.nativeImage.createFromPath(imgPath);
+          if (!img.isEmpty()) {
+            return img.resize({ width: 128 }).toDataURL();
+          }
+        }
+      } catch { /* plain Node.js or resize failed */ }
+    }
+
+    if (st.size <= 512 * 1024) {
+      const buf = await fs.promises.readFile(imgPath);
+      return `data:${mime};base64,${buf.toString('base64')}`;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
+ * Returns a lightweight thumbnail data URL for an image file or the first image inside a folder.
+ */
+export async function getThumbnail(root: string, itemPath: string): Promise<string | null> {
+  const target = resolveInside(root, itemPath);
+  const st = await fs.promises.stat(target);
+  if (st.isFile()) {
+    return readImageThumbnailDataUrl(target);
+  }
+  if (st.isDirectory()) {
+    let dirents: fs.Dirent[];
+    try {
+      dirents = await fs.promises.readdir(target, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    let checked = 0;
+    for (const d of dirents) {
+      if (!d.isFile()) continue;
+      const ext = path.extname(d.name).toLowerCase();
+      if (!PREVIEW_IMAGE_MIME[ext]) continue;
+      checked++;
+      const thumb = await readImageThumbnailDataUrl(path.join(target, d.name));
+      if (thumb) return thumb;
+      if (checked >= 3) break;
+    }
+  }
+  return null;
 }

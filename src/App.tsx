@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dict, type Lang } from './i18n';
-import type { Aria2EngineState, CategoryDirKey, ClipboardUrlSuggestion, ColorId, DiskSpaceWarning, DownloadItem, DuplicateCheckResult, FileEntry, ItemMeta, UpdateState, ViewMode } from './types';
+import type { Aria2EngineState, AppSettings, CategoryDirKey, ClipboardUrlSuggestion, ColorId, DiskSpaceWarning, DownloadItem, DuplicateCheckResult, FileEntry, ItemMeta, UpdateState, ViewMode } from './types';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import DownloadsPanel, { type DlTab } from './components/DownloadsPanel';
-import ExplorerPane, { type ActionKind } from './components/ExplorerPane';
+import ExplorerPane, { type ActionKind, type ExplorerView } from './components/ExplorerPane';
 import MoveDialog from './components/MoveDialog';
 import StatusBar from './components/StatusBar';
 import PromptDialog from './components/PromptDialog';
@@ -12,6 +12,7 @@ import SummaryDialog from './components/SummaryDialog';
 import AliasesDialog from './components/AliasesDialog';
 import ChecksumDialog from './components/ChecksumDialog';
 import SettingsDialog from './components/SettingsDialog';
+import SetupWizardModal from './components/SetupWizardModal';
 import AddDownloadDialog from './components/AddDownloadDialog';
 import BatchRenameDialog from './components/BatchRenameDialog';
 import QuickPreviewModal from './components/QuickPreviewModal';
@@ -31,7 +32,7 @@ export default function App() {
   const [histories, setHistories] = useState<[PaneHistory, PaneHistory]>([initHist(), initHist()]);
   const [activePane, setActivePane] = useState<0 | 1>(0);
   const [dual, setDual] = useState(false);
-  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [view, setView] = useState<ExplorerView>('grid');
   const [search, setSearch] = useState('');
   const [searchDownloads, setSearchDownloads] = useState(true);
   const [searchFiles, setSearchFiles] = useState(true);
@@ -57,6 +58,10 @@ export default function App() {
   const [afterDownloadAction, setAfterDownloadAction] = useState<'notify' | 'open_folder' | 'sleep'>('notify');
   const [batteryLiteMode, setBatteryLiteMode] = useState(false);
   const [dragDropEnabled, setDragDropEnabled] = useState(true);
+  const [dragMergeToCreateFolder, setDragMergeToCreateFolder] = useState(false);
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [setupWizardOpen, setSetupWizardOpen] = useState(false);
+  const [setupCanDismiss, setSetupCanDismiss] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [highlightDuplicates, setHighlightDuplicates] = useState(false);
   const [paneEntries, setPaneEntries] = useState<[FileEntry[], FileEntry[]]>([[], []]);
@@ -119,11 +124,17 @@ export default function App() {
       setAfterDownloadAction(s.afterDownloadAction ?? 'notify');
       setBatteryLiteMode(!!s.batteryLiteMode);
       setDragDropEnabled(s.dragDropEnabled !== false);
+      setDragMergeToCreateFolder(!!s.dragMergeToCreateFolder);
+      setAutoCheckUpdates(s.autoCheckUpdates !== false);
       setExtensionEnabled(s.extensionEnabled !== false);
       setExtensionPort(s.extensionPort ?? 47832);
       setCategoryDirs(s.categoryDirs ?? {});
       if (s.viewMode === 'downloads' || s.viewMode === 'files' || s.viewMode === 'default') {
         setViewMode(s.viewMode);
+      }
+      if (!s.setupCompleted) {
+        setSetupCanDismiss(false);
+        setSetupWizardOpen(true);
       }
     }).catch(() => undefined);
     api.files.getDownloadDirInfo().then((i) => {
@@ -323,6 +334,34 @@ export default function App() {
     void api?.settings.set({ dragDropEnabled: next });
   };
 
+  const toggleDragMerge = () => {
+    const next = !dragMergeToCreateFolder;
+    setDragMergeToCreateFolder(next);
+    void api?.settings.set({ dragMergeToCreateFolder: next });
+  };
+
+  const completeSetupWizard = async (patch: Partial<AppSettings>) => {
+    const updated = await api?.settings.set(patch);
+    if (updated) {
+      setLang(updated.language);
+      setClipboardMonitor(updated.clipboardMonitor !== false);
+      setAutoOrganize(updated.autoOrganizeEnabled !== false);
+      setAutoCheckUpdates(updated.autoCheckUpdates !== false);
+      if (updated.viewMode === 'downloads' || updated.viewMode === 'files' || updated.viewMode === 'default') {
+        setViewMode(updated.viewMode);
+      }
+      if (updated.downloadDir) {
+        setDefaultDownloadDir(updated.downloadDir);
+        setRoot(updated.downloadDir);
+        setHistories([initHist(updated.downloadDir), initHist(updated.downloadDir)]);
+      }
+    }
+    setSetupWizardOpen(false);
+    refresh();
+    loadMeta();
+    notify(t.setupSaved);
+  };
+
   const changeDownloadDir = async (dir: string) => {
     const updated = await api?.settings.set({ downloadDir: dir });
     if (updated?.downloadDir) {
@@ -492,6 +531,14 @@ export default function App() {
     colorOf: (p: string) => metaMap[keyOf(p)]?.color ?? (autoColor ? autoColors[keyOf(p)] : undefined),
     setColor: setFolderColor,
     setTag: setFolderTag,
+    allTags: () => {
+      const seen = new Set<string>();
+      for (const m of Object.values(metaMap)) {
+        const tag = m?.tag?.trim();
+        if (tag) seen.add(tag);
+      }
+      return [...seen].sort((a, b) => a.localeCompare(b));
+    },
     editSummary: (p: string) => setSummaryPath(p),
     editAliases: (p: string) => setAliasesPath(p),
     markOpened,
@@ -587,6 +634,14 @@ export default function App() {
     void run(async () => { const r = await api?.files.moveItems(paths, target); return `${t.movedN}: ${r?.length ?? 0}`; });
   };
 
+  const mergeToFolder = (paths: string[], targetFile: string) => {
+    void run(async () => {
+      await api?.files.mergeToFolder(paths, targetFile);
+      loadMeta();
+      return t.mergedIntoFolder;
+    });
+  };
+
   const onAction = (kind: ActionKind, paths: string[]) => {
     if (!api || paths.length === 0) return;
     switch (kind) {
@@ -595,7 +650,8 @@ export default function App() {
       case 'rename': setRenamePath(paths[0]); break;
       case 'move': setMoveSources(paths); break;
       case 'delete': void run(async () => { const n = await api.files.deleteItems(paths); return `${t.deletedN}: ${n}`; }); break;
-      case 'extract': void run(async () => { await api.files.smartExtractArchive(paths[0]); return t.extracted; }); break;
+      case 'extract': void run(async () => { await api.files.smartExtractArchive(paths[0], 'folder'); return t.extracted; }); break;
+      case 'extract_here': void run(async () => { await api.files.smartExtractArchive(paths[0], 'here'); return t.extracted; }); break;
     }
   };
 
@@ -621,6 +677,7 @@ export default function App() {
         canForward={h.index >= 0 && h.index < h.stack.length - 1}
         autoOrganize={autoOrganize}
         dragDropEnabled={dragDropEnabled}
+        dragMergeToCreateFolder={dragMergeToCreateFolder}
         highlightDuplicates={highlightDuplicates}
         dual={dual}
         autoColor={autoColor}
@@ -631,7 +688,8 @@ export default function App() {
         onBatchRename={(list) => setBatchRenameTargets(list)}
         onNewFolder={() => { setActivePane(i); setDialog('folder'); }}
         onToggleAutoOrganize={toggleAutoOrganize}
-        onToggleView={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))}
+        onToggleView={() => setView((v) => (v === 'grid' ? 'list' : v === 'list' ? 'content' : 'grid'))}
+        onSetView={(v) => setView(v)}
         onToggleDual={() => { setDual((d) => !d); setActivePane(0); }}
         onToggleDuplicates={() => setHighlightDuplicates((x) => !x)}
         onOrganizeNow={organizeNow}
@@ -641,7 +699,7 @@ export default function App() {
         onForward={() => goForwardPane(i)}
         onUp={() => goUpPane(i)}
         onCopyPath={copyPath}
-        onActivate={() => setActivePane(i)} onNavigate={navigatePane(i)} onStats={onStats} onAction={onAction} onDropItems={dropItems}
+        onActivate={() => setActivePane(i)} onNavigate={navigatePane(i)} onStats={onStats} onAction={onAction} onDropItems={dropItems} onMergeToFolder={mergeToFolder}
       />
     );
   };
@@ -867,7 +925,28 @@ export default function App() {
           updateState={updateState}
           onCheckForUpdates={checkForUpdates}
           onUpdateNow={triggerUpdateNow}
+          onOpenSetupWizard={() => { setSetupCanDismiss(true); setSetupWizardOpen(true); }}
+          dragMergeToCreateFolder={dragMergeToCreateFolder}
+          onToggleDragMerge={toggleDragMerge}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      {setupWizardOpen && (
+        <SetupWizardModal
+          api={api}
+          t={t}
+          lang={lang}
+          initialSettings={{
+            downloadDir: root || defaultDownloadDir,
+            viewMode,
+            clipboardMonitor,
+            autoOrganizeEnabled: autoOrganize,
+            autoCheckUpdates
+          }}
+          canDismiss={setupCanDismiss}
+          onChangeLang={changeLang}
+          onComplete={completeSetupWizard}
+          onClose={() => setSetupWizardOpen(false)}
         />
       )}
       {paletteOpen && (

@@ -149,6 +149,30 @@ const rejects = async (fn, label) => { let threw = false; try { await fn(); } ca
     assert.equal(indicators[cleanFolder.toLowerCase()].hasDuplicates, false);
     ok('inspectFolderIndicators flags folders with duplicate/copy files and ignores clean folders');
 
+    // smartExtractArchive mode 'here' & getThumbnail for image/folder
+    const hereZip = new AdmZip();
+    hereZip.addFile('here_a.txt', Buffer.from('here-a', 'utf8'));
+    hereZip.addFile('here_b.txt', Buffer.from('here-b', 'utf8'));
+    const hereZipDir = path.join(base, 'here_extract_dir');
+    fs.mkdirSync(hereZipDir, { recursive: true });
+    const hereZipPath = path.join(hereZipDir, 'here.zip');
+    hereZip.writeZip(hereZipPath);
+    await ops.smartExtractArchive(ROOT, hereZipPath, 'here');
+    assert.ok(fs.existsSync(path.join(hereZipDir, 'here_a.txt')));
+    assert.ok(fs.existsSync(path.join(hereZipDir, 'here_b.txt')));
+    ok('smartExtractArchive mode="here" extracts files into current directory');
+
+    const thumbDir = path.join(base, 'thumb_dir');
+    fs.mkdirSync(thumbDir, { recursive: true });
+    const png1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    const imgPath = path.join(thumbDir, 'cover.png');
+    fs.writeFileSync(imgPath, png1x1);
+    const fileThumb = await ops.getThumbnail(ROOT, imgPath);
+    const dirThumb = await ops.getThumbnail(ROOT, thumbDir);
+    assert.ok(typeof fileThumb === 'string' && fileThumb.startsWith('data:image/png;base64,'));
+    assert.ok(typeof dirThumb === 'string' && dirThumb.startsWith('data:image/png;base64,'));
+    ok('getThumbnail generates thumbnail data URLs for image files and folders');
+
     console.log(`\nALL PASSED (${passed} checks)`);
   } finally {
     fs.rmSync(base, { recursive: true, force: true });

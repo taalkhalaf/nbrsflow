@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { CategoryDirKey, DiskSpace, FolderNode, NbrsAPI } from '../types';
-import { PRESET_FOLDER_TAGS } from '../types/metadata';
 import type { Dict } from '../i18n';
 import ContextMenu from './ContextMenu';
 import FolderIcon from './FolderIcon';
@@ -94,7 +93,7 @@ function TreeNode({ node, depth, p, expandedInit }: { node: FolderNode; depth: n
           { label: p.t.open, onClick: () => p.onNavigate(node.path) },
           'sep',
           { kind: 'colors', label: p.t.folderColor, defaultLabel: p.t.colorDefault, autoLabel: p.t.colorAuto, names: p.t.colors, current: m?.color, onPick: (c) => meta.setColor([node.path], c) },
-          { kind: 'tags', label: p.t.folderTags, presets: PRESET_FOLDER_TAGS, clearLabel: p.t.tagClear, customPlaceholder: p.t.tagCustomPlaceholder, setLabel: p.t.tagSet, current: m?.tag, onPick: (tag) => meta.setTag([node.path], tag) },
+          { kind: 'tags', label: p.t.folderTags, userTags: meta.allTags(), emptyHint: p.t.tagEmptyHint, clearLabel: p.t.tagClear, customPlaceholder: p.t.tagCustomPlaceholder, setLabel: p.t.tagSet, current: m?.tag, onPick: (tag) => meta.setTag([node.path], tag) },
           { label: p.t.editSummary, onClick: () => meta.editSummary(node.path) },
           { label: p.t.manageAliases, onClick: () => meta.editAliases(node.path) }
         ]} />

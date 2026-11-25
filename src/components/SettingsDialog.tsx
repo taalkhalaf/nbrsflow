@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Dict, Lang } from '../i18n';
 import { extractAndFilterUrls, type UrlFilterCategory } from '../lib/urlFilter';
-import type { ExtensionBridgeStatus, NbrsAPI, UpdateState } from '../types';
+import type { AfterExtractAction, ExtensionBridgeStatus, NbrsAPI, UpdateState } from '../types';
 import {
   IconDownload,
   IconFolderOpen,
@@ -52,6 +52,9 @@ interface Props {
   updateState?: UpdateState | null;
   onCheckForUpdates?: () => Promise<void> | void;
   onUpdateNow?: () => Promise<void> | void;
+  onOpenSetupWizard?: () => void;
+  dragMergeToCreateFolder?: boolean;
+  onToggleDragMerge?: () => void;
   onClose: () => void;
 }
 
@@ -91,6 +94,9 @@ export default function SettingsDialog({
   updateState,
   onCheckForUpdates,
   onUpdateNow,
+  onOpenSetupWizard,
+  dragMergeToCreateFolder,
+  onToggleDragMerge,
   onClose
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>('appearance');
@@ -109,6 +115,8 @@ export default function SettingsDialog({
   const [autoMoveCompleted, setAutoMoveCompleted] = useState(false);
   const [groupByTag, setGroupByTag] = useState(false);
   const [disableGpu, setDisableGpu] = useState(false);
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [afterExtractAction, setAfterExtractAction] = useState<AfterExtractAction>('keep');
   const [dlSaved, setDlSaved] = useState(false);
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
 
@@ -149,6 +157,8 @@ export default function SettingsDialog({
       setAutoMoveCompleted(!!s.autoMoveCompletedSeries);
       setGroupByTag(!!s.groupFoldersByTag);
       setDisableGpu(!!s.disableHardwareAcceleration);
+      setAutoCheckUpdates(s.autoCheckUpdates !== false);
+      setAfterExtractAction(s.afterExtractAction ?? 'keep');
     }).catch(() => undefined);
   }, [api, maxConcurrentDownloads, maxDownloadSpeedKbps]);
 
@@ -605,6 +615,35 @@ export default function SettingsDialog({
                     void api?.settings.set({ groupFoldersByTag: next });
                   }
                 )}
+
+                {onToggleDragMerge && switchRow(
+                  'toggle-drag-merge',
+                  t.dragMergeSetting,
+                  t.dragMergeSettingDesc,
+                  !!dragMergeToCreateFolder,
+                  onToggleDragMerge
+                )}
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-bg p-3.5">
+                  <label htmlFor="after-extract-select" className="text-sm font-medium text-fg">
+                    {t.afterExtractLabel}
+                  </label>
+                  <select
+                    id="after-extract-select"
+                    data-testid="after-extract-select"
+                    value={afterExtractAction}
+                    onChange={(e) => {
+                      const val = e.target.value as AfterExtractAction;
+                      setAfterExtractAction(val);
+                      void api?.settings.set({ afterExtractAction: val });
+                    }}
+                    className="rounded-lg border border-line bg-panel px-2.5 py-1.5 text-xs text-fg outline-none focus:border-silver"
+                  >
+                    <option value="keep">{t.afterExtractKeep}</option>
+                    <option value="trash">{t.afterExtractTrash}</option>
+                    <option value="move_to_archive">{t.afterExtractMove}</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -613,6 +652,17 @@ export default function SettingsDialog({
                 {switchRow('toggle-startup', t.launchAtStartup, t.launchAtStartupDesc, launchAtStartup, onToggleStartup)}
                 {switchRow('toggle-tray', t.closeToTrayTitle, t.closeToTrayDesc, minimizeToTray, onToggleTray)}
                 {switchRow('toggle-battery-lite', t.batteryLiteMode, t.batteryLiteModeDesc, batteryLiteMode, onToggleBatteryLite)}
+                {switchRow(
+                  'toggle-auto-updates',
+                  t.setupAutoCheckUpdates,
+                  t.setupAutoCheckUpdatesDesc,
+                  autoCheckUpdates,
+                  () => {
+                    const next = !autoCheckUpdates;
+                    setAutoCheckUpdates(next);
+                    void api?.settings.set({ autoCheckUpdates: next });
+                  }
+                )}
                 {switchRow(
                   'toggle-disable-gpu',
                   t.disableHardwareAccel,
@@ -623,6 +673,22 @@ export default function SettingsDialog({
                     setDisableGpu(next);
                     void api?.settings.set({ disableHardwareAcceleration: next });
                   }
+                )}
+                {onOpenSetupWizard && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-bg p-3.5">
+                    <div>
+                      <div className="text-sm font-medium text-fg">{t.setupReopen}</div>
+                      <div className="mt-0.5 text-xs text-muted">{t.setupWizardDesc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="reopen-setup-wizard-btn"
+                      onClick={() => { onClose(); onOpenSetupWizard(); }}
+                      className="shrink-0 rounded-lg border border-line bg-panel2 px-3 py-1.5 text-xs font-medium text-fg hover:border-silver"
+                    >
+                      {t.setupReopen}
+                    </button>
+                  </div>
                 )}
               </div>
             )}

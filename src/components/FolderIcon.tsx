@@ -4,14 +4,15 @@ import { colorHex } from '../lib/palette';
 interface FolderIconProps {
   color?: string;
   tag?: string;
+  thumbnail?: string;
   className?: string;
 }
 
 /**
  * Sleek, modern layered folder icon with SVG gradients, glass edge highlights,
- * full custom color support, and optional embedded tag pill.
+ * full custom color support, optional folder thumbnail preview, and optional embedded tag pill.
  */
-export default function FolderIcon({ color, tag, className = 'h-10 w-10' }: FolderIconProps) {
+export default function FolderIcon({ color, tag, thumbnail, className = 'h-10 w-10' }: FolderIconProps) {
   const base = colorHex(color);
   const uid = useId().replace(/:/g, '');
   const backGradId = `fb-${uid}`;
@@ -78,6 +79,15 @@ export default function FolderIcon({ color, tag, className = 'h-10 w-10' }: Fold
           <rect x="16" y="26.5" width="16" height="2" rx="1" fill="#FFFFFF" fillOpacity="0.28" />
         )}
       </svg>
+
+      {thumbnail && (
+        <img
+          src={thumbnail}
+          alt=""
+          data-testid="folder-thumbnail-preview"
+          className="pointer-events-none absolute inset-x-[18%] top-[36%] h-[42%] w-[64%] rounded-[4px] border border-white/40 object-cover shadow-sm"
+        />
+      )}
 
       {tag && (
         <span

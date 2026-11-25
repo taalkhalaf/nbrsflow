@@ -153,10 +153,10 @@ const ok = (n) => { passed++; console.log('  ok -', n); };
     assert.ok(fs.existsSync(dec3.targetDir));
     ok('first file with explicit S01E01 marker creates its series folder immediately');
 
-    // 5. Non-sequence standalone file stays in root
+    // 5. Non-sequence standalone video stays in root
     const dec4 = await resolveAutoOrganizedDownloadDir({
-      url: 'http://127.0.0.1/annual_report.pdf',
-      fileName: 'annual_report.pdf',
+      url: 'http://127.0.0.1/standalone_movie.mkv',
+      fileName: 'standalone_movie.mkv',
       requestedDir: scratch,
       rootDir: scratch,
       isAutoOrganizeEnabled: () => true,
@@ -164,7 +164,7 @@ const ok = (n) => { passed++; console.log('  ok -', n); };
     });
     assert.equal(dec4.targetDir, scratch);
     assert.equal(dec4.autoGroupedFolder, undefined);
-    ok('normal non-sequence file stays in the main downloads folder');
+    ok('normal non-sequence video stays in the main downloads folder');
 
     // 6. Respect autoOrganizeEnabled = false
     const dec5 = await resolveAutoOrganizedDownloadDir({
@@ -406,6 +406,35 @@ const ok = (n) => { passed++; console.log('  ok -', n); };
     assert.equal(groupedByTag.length, 1);
     assert.equal(fs.existsSync(path.join(tagRoot, 'أنمي', 'Naruto')), true);
     ok('end-episode detection, 1..N completion check, moveCompletedSeriesFolders, and groupFoldersByTagInRoot verified');
+
+    // 17. Unified type folders for Documents, Executables, Audio (no per-file folders) + archives preserved
+    const typeRoot = path.join(scratch, 'type_root');
+    fs.mkdirSync(typeRoot, { recursive: true });
+    fs.writeFileSync(path.join(typeRoot, 'Report 1.pdf'), 'pdf1');
+    fs.writeFileSync(path.join(typeRoot, 'Track 01.mp3'), 'mp3');
+    fs.writeFileSync(path.join(typeRoot, 'Installer_v2.exe'), 'exe');
+    fs.writeFileSync(path.join(typeRoot, 'backup.zip'), 'zip');
+
+    const decDoc = await resolveAutoOrganizedDownloadDir({
+      url: 'http://127.0.0.1/Report_2.pdf',
+      fileName: 'Report 2.pdf',
+      requestedDir: typeRoot,
+      rootDir: typeRoot,
+      language: 'en',
+      isAutoOrganizeEnabled: () => true,
+      getTrackedDownloads: () => []
+    });
+    assert.equal(decDoc.targetDir, path.join(typeRoot, 'Documents'));
+    assert.equal(fs.existsSync(path.join(typeRoot, 'Documents', 'Report 1.pdf')), true);
+    assert.equal(fs.existsSync(path.join(typeRoot, 'Report')), false);
+
+    const orgTypeRes = await organizeDirectorySequences(typeRoot, typeRoot, { language: 'en' });
+    assert.ok(orgTypeRes.movedCount >= 2);
+    assert.equal(fs.existsSync(path.join(typeRoot, 'Executables', 'Installer_v2.exe')), true);
+    assert.equal(fs.existsSync(path.join(typeRoot, 'Audio', 'Track 01.mp3')), true);
+    assert.equal(fs.existsSync(path.join(typeRoot, 'Track')), false);
+    assert.equal(fs.existsSync(path.join(typeRoot, 'backup.zip')), true);
+    ok('unified type folders collect Documents, Executables, and Audio without per-file folders while preserving archives');
 
     console.log(`\nALL PASSED (${passed} checks)`);
   } finally {

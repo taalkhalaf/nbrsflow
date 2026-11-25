@@ -62,6 +62,15 @@ async function waitFor(fn, label, timeout = 15000) {
   await waitFor(async () => (await ev('typeof window.nbrsAPI === "object" && document.readyState === "complete"')) === true, 'window.nbrsAPI bridge available', 8000);
   ok('window.nbrsAPI bridge available');
 
+  // First-run Setup Wizard appears on fresh userData and saves configuration
+  await waitFor(() => ev(`!!document.querySelector('[data-testid="setup-wizard-modal"]')`), 'setup wizard shown on first run');
+  assert.ok(await ev(`!!document.querySelector('[data-testid="setup-download-dir-input"]')`));
+  assert.ok(await ev(`!!document.querySelector('[data-testid="setup-viewmode-default"]') && !!document.querySelector('[data-testid="setup-viewmode-downloads"]') && !!document.querySelector('[data-testid="setup-viewmode-files"]')`));
+  await ev(`document.querySelector('[data-testid="setup-wizard-finish"]').click()`);
+  await waitFor(() => ev(`!document.querySelector('[data-testid="setup-wizard-modal"]')`), 'setup wizard closed after finish');
+  assert.equal((await ev(`window.nbrsAPI.settings.get()`)).setupCompleted, true);
+  ok('First-run Setup Wizard verified and completed');
+
   const pkgVer = require('../package.json').version;
   assert.equal(await ev('window.nbrsAPI.version'), pkgVer);
   assert.equal(await ev(`document.querySelector('[data-testid="app-version"]')?.textContent?.trim()`), `v${pkgVer}`);
@@ -417,18 +426,18 @@ async function waitFor(fn, label, timeout = 15000) {
     // auto-organize sequence download in root + badge in UI
     await ev(`window.nbrsAPI.settings.set({ autoOrganizeEnabled: true })`);
     assert.ok(await ev(`!!document.querySelector('[data-testid="autoorganize-toggle"]') && !!document.querySelector('[data-testid="organize-now-btn"]')`));
-    const seqItem = await ev(`window.nbrsAPI.downloads.add('http://127.0.0.1:${dlPort}/E2E_Auto_Series_S01E01_1080p.txt')`);
+    const seqItem = await ev(`window.nbrsAPI.downloads.add('http://127.0.0.1:${dlPort}/E2E_Auto_Series_S01E01_1080p.mp4')`);
     assert.equal(seqItem.autoGroupedFolder, 'E2E Auto Series');
     await waitFor(() => ev(`document.querySelector('[data-testid="auto-group-badge"]')?.textContent.includes('E2E Auto Series')`), 'auto-group badge shown');
-    await waitFor(() => fs.existsSync(path.join(ROOT, 'E2E Auto Series', 'E2E_Auto_Series_S01E01_1080p.txt')), 'auto-grouped file written to sequence folder');
+    await waitFor(() => fs.existsSync(path.join(ROOT, 'E2E Auto Series', 'E2E_Auto_Series_S01E01_1080p.mp4')), 'auto-grouped file written to sequence folder');
     ok('auto-organize routes S01E01 download into normalized folder and displays badge in UI');
 
-    // abbreviated download "EAS.Ep02.txt" matches "E2E Auto Series" via generated default alias "EAS"
-    const aliasItem = await ev(`window.nbrsAPI.downloads.add('http://127.0.0.1:${dlPort}/EAS.Ep02.txt')`);
+    // abbreviated download "EAS.Ep02.mp4" matches "E2E Auto Series" via generated default alias "EAS"
+    const aliasItem = await ev(`window.nbrsAPI.downloads.add('http://127.0.0.1:${dlPort}/EAS.Ep02.mp4')`);
     assert.equal(aliasItem.autoGroupedFolder, 'E2E Auto Series');
     assert.equal(aliasItem.matchedAlias, 'EAS');
     await waitFor(() => ev(`document.querySelector('[data-testid="auto-group-badge"]')?.textContent.includes('(EAS)')`), 'alias badge shown in UI');
-    await waitFor(() => fs.existsSync(path.join(ROOT, 'E2E Auto Series', 'EAS.Ep02.txt')), 'alias-routed file written to sequence folder');
+    await waitFor(() => fs.existsSync(path.join(ROOT, 'E2E Auto Series', 'EAS.Ep02.mp4')), 'alias-routed file written to sequence folder');
     ok('abbreviated download routes into folder via alias and shows "(EAS)" in UI badge');
 
     await ev(`window.nbrsAPI.downloads.cancel(${JSON.stringify(seqItem.id)}, true)`);
@@ -606,18 +615,36 @@ async function waitFor(fn, label, timeout = 15000) {
 
     await ev(`(() => { const el = window.__t.item('CompleteAnimeE2E'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.left + 20, clientY: r.top + 20 })); })()`);
     await waitFor(() => ev(`!!document.querySelector('[data-testid="tag-row"]')`), 'context menu tag-row shown');
-    await ev(`document.querySelector('[data-testid="tag-row"] button[data-tag="أنمي"]').click()`);
-    await waitFor(() => ev(`window.__t.item('CompleteAnimeE2E')?.querySelector('[data-testid="folder-tag-label"]')?.textContent?.trim() === 'أنمي'`), 'folder tag displayed on icon');
+    assert.ok(await ev(`!!document.querySelector('[data-testid="user-tags-empty-hint"]')`), 'no hardcoded preset tags');
+    await ev(`(() => { const inp = document.querySelector('[data-testid="custom-tag-input"]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(inp, 'أنمي'); inp.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await ev(`document.querySelector('[data-testid="custom-tag-submit"]').click()`);
+    await waitFor(() => ev(`window.__t.item('CompleteAnimeE2E')?.querySelector('[data-testid="folder-tag-label"]')?.textContent?.trim() === 'أنمي'`), 'custom folder tag displayed on icon');
+    await ev(`(() => { const el = window.__t.item('CompleteAnimeE2E'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.left + 20, clientY: r.top + 20 })); })()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="user-tags-list"] button[data-tag="أنمي"]')`), 'user-created tag saved for reuse');
+    await ev(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
     fs.rmSync(completeDir, { recursive: true, force: true });
-    ok('Series completion badge (end) and Folder Tagging on Windows-style icon verified');
+    ok('Series completion badge (end) and free-form Folder Tagging (no presets) verified');
 
-    // Settings -> Downloads: verify auto-move-completed and group-by-tag default to false
+    // Explorer Content view, Quick Selection Bar, and Sort/Group controls
+    assert.ok(await ev(`!!document.querySelector('[data-testid="selection-quick-actions"]')`), 'selection quick actions shown when item selected');
+    await ev(`(() => { const p = document.querySelector('[data-testid="pane-items"]'); p.dispatchEvent(new MouseEvent('click', { bubbles: true })); })()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="explorer-sort-select"]') && !!document.querySelector('[data-testid="explorer-group-select"]')`), 'sort and group controls visible when selection cleared');
+    await ev(`document.querySelector('[data-testid="explorer-view-content"]').click()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="explorer-content-view"]')`), 'explorer content view rendered');
+    await ev(`document.querySelector('[data-testid="explorer-view-grid"]').click()`);
+    await waitFor(() => ev(`!document.querySelector('[data-testid="explorer-content-view"]')`), 'explorer returned to grid view');
+    ok('Explorer Content view, Quick Selection Bar, Sort, and Group controls verified');
+
+    // Settings -> Downloads: verify auto-move-completed, group-by-tag, and drag-merge default to false + after-extract-select
     await ev(`document.querySelector('[data-testid="settings-btn"]').click()`);
-    await waitFor(() => ev(`!!document.querySelector('[data-testid="settings-dialog"]')`), 'settings dialog opened for v0.2.10 toggles');
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="settings-dialog"]')`), 'settings dialog opened for v0.2.12 toggles');
     await ev(`document.querySelector('[data-testid="settings-tab-downloads"]').click()`);
-    await waitFor(() => ev(`document.querySelector('[data-testid="toggle-auto-move-completed"]')?.getAttribute('aria-checked') === 'false' && document.querySelector('[data-testid="toggle-group-by-tag"]')?.getAttribute('aria-checked') === 'false'`), 'autoMoveCompleted and groupByTag default to false');
+    await waitFor(() => ev(`document.querySelector('[data-testid="toggle-auto-move-completed"]')?.getAttribute('aria-checked') === 'false' && document.querySelector('[data-testid="toggle-group-by-tag"]')?.getAttribute('aria-checked') === 'false' && document.querySelector('[data-testid="toggle-drag-merge"]')?.getAttribute('aria-checked') === 'false'`), 'autoMoveCompleted, groupByTag, and dragMerge default to false');
+    assert.ok(await ev(`!!document.querySelector('[data-testid="after-extract-select"]')`));
+    await ev(`document.querySelector('[data-testid="settings-tab-system"]').click()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-testid="reopen-setup-wizard-btn"]')`), 'reopen-setup-wizard-btn visible');
     await ev(`document.querySelector('[data-testid="settings-close-btn"]').click()`);
-    ok('Auto-move completed & Group-by-tag settings defaults (false) verified');
+    ok('Drag-merge default (false), after-extract selector, and Setup Wizard reopen button verified');
 
     // Textual folder "Updated" (محدّث) badge + auto-clear on markOpened + Settings -> About update check button
     const updFolder = path.join(base, 'UpdatedSeriesE2E');

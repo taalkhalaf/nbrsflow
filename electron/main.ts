@@ -270,6 +270,12 @@ function registerIpc(): void {
     }
     if (typeof patch?.autoMoveCompletedSeries === 'boolean') safe.autoMoveCompletedSeries = patch.autoMoveCompletedSeries;
     if (typeof patch?.groupFoldersByTag === 'boolean') safe.groupFoldersByTag = patch.groupFoldersByTag;
+    if (typeof patch?.setupCompleted === 'boolean') safe.setupCompleted = patch.setupCompleted;
+    if (typeof patch?.autoCheckUpdates === 'boolean') safe.autoCheckUpdates = patch.autoCheckUpdates;
+    if (patch?.afterExtractAction === 'keep' || patch?.afterExtractAction === 'trash' || patch?.afterExtractAction === 'move_to_archive') {
+      safe.afterExtractAction = patch.afterExtractAction;
+    }
+    if (typeof patch?.dragMergeToCreateFolder === 'boolean') safe.dragMergeToCreateFolder = patch.dragMergeToCreateFolder;
     if (typeof patch?.disableHardwareAcceleration === 'boolean') {
       safe.disableHardwareAcceleration = patch.disableHardwareAcceleration;
       if (!patch.disableHardwareAcceleration) {
@@ -590,18 +596,63 @@ function registerIpc(): void {
   ipcMain.handle('files:inspectFolderIndicators', (_e, folderPaths: string[]) => {
     return ops.inspectFolderIndicators(rootDir(), folderPaths);
   });
-  ipcMain.handle('files:smartExtractArchive', async (_e, p: string) => {
+  ipcMain.handle('files:smartExtractArchive', async (_e, p: string, mode?: 'smart' | 'folder' | 'here') => {
     const safeArchive = assertAllowed(p);
-    const out = await ops.smartExtractArchive(rootDir(), safeArchive);
+    const out = await ops.smartExtractArchive(rootDir(), safeArchive, mode ?? 'smart');
     const parent = path.dirname(safeArchive);
     safeStore(() => { if (store.isAutoCreated(parent)) store.setAutoCreated(parent, false); });
+    const afterAction = store.getSettings().afterExtractAction ?? 'keep';
+    if (afterAction === 'trash') {
+      try {
+        await shell.trashItem(safeArchive);
+        safeStore(() => store.removeKey(safeArchive));
+      } catch { /* ignore if locked */ }
+    } else if (afterAction === 'move_to_archive') {
+      try {
+        const archiveDirName = store.getSettings().language === 'en' ? 'Archives' : 'الأرشيف';
+        const archiveDir = path.join(rootDir(), archiveDirName);
+        await fs.promises.mkdir(archiveDir, { recursive: true });
+        if (path.dirname(safeArchive).toLowerCase() !== archiveDir.toLowerCase()) {
+          const [movedArchive] = await ops.moveItems(rootDir(), [safeArchive], archiveDir);
+          if (movedArchive) {
+            safeStore(() => store.moveKey(safeArchive, movedArchive));
+            aria2?.relocateCompletedItem(safeArchive, movedArchive);
+          }
+        }
+      } catch { /* ignore */ }
+    }
     return out;
+  });
+  ipcMain.handle('files:getThumbnail', (_e, p: string) => {
+    const safe = assertAllowedInAnyRoot(p);
+    const ownerRoot = allowedRoots().find((r) => {
+      try { ops.resolveInside(r, safe); return true; } catch { return false; }
+    }) ?? rootDir();
+    return ops.getThumbnail(ownerRoot, safe);
+  });
+  ipcMain.handle('files:mergeToFolder', async (_e, sources: string[], targetFile: string) => {
+    const r = rootDir();
+    const safeTarget = assertAllowed(targetFile);
+    const parent = path.dirname(safeTarget);
+    const baseStem = normalizeTitle(path.basename(safeTarget)).normalizedTitle || path.basename(safeTarget, path.extname(safeTarget)) || 'Group';
+    const newFolder = ops.uniquePath(parent, ops.validateName(baseStem));
+    await fs.promises.mkdir(newFolder, { recursive: true });
+    const toMove = Array.from(new Set([safeTarget, ...sources.map((s) => assertAllowed(s))]));
+    const moved = await ops.moveItems(r, toMove, newFolder);
+    const movePairs = moved.map((dest, i) => ({ from: toMove[i], to: dest }));
+    safeStore(() => {
+      for (const m of movePairs) store.moveKey(m.from, m.to);
+    });
+    for (const m of movePairs) aria2?.relocateCompletedItem(m.from, m.to);
+    if (movePairs.length > 0) pushUndo({ kind: 'move', moves: movePairs });
+    return newFolder;
   });
   ipcMain.handle('files:computeHashes', (_e, p: string) => ops.computeFileHashes(rootDir(), p));
   ipcMain.handle('files:organizeSequences', async (_e, dir?: string) => {
     const orgMoves: { from: string; to: string }[] = [];
     const res = await store.batchUpdateAsync(() =>
       organizeDirectorySequences(rootDir(), assertAllowed(dir ?? rootDir()), {
+        language: store.getSettings().language,
         getFolderAliases: (p) => { try { return store.getAliases(p); } catch { return []; } },
         onRegisterDefaultAliases: (p, defaults) => {
           safeStore(() => { if (store.getAliases(p).length === 0) store.setAliases(p, defaults); });
@@ -949,6 +1000,7 @@ if (!gotLock) {
     setDownloadTargetDirResolver(async (req) => {
       const decision = await resolveAutoOrganizedDownloadDir({
         ...req,
+        language: store.getSettings().language,
         isAutoOrganizeEnabled: () => store.getSettings().autoOrganizeEnabled !== false,
         getTrackedDownloads: () => aria2?.listDownloads() ?? [],
         getFolderAliases: (p) => store.getAliases(p),
@@ -993,6 +1045,7 @@ if (!gotLock) {
         }
         if (destAbs.toLowerCase() === rootAbs.toLowerCase()) {
           await organizeDirectorySequences(rootDir(), rootDir(), {
+            language: store.getSettings().language,
             getFolderAliases: (p) => store.getAliases(p),
             onRegisterDefaultAliases: registerDefaultsIfEmpty,
             onFolderAutoCreated: markFolderAutoCreated,
@@ -1118,7 +1171,7 @@ if (!gotLock) {
         setTimeout(() => { app.quit(); }, 300);
       }
     });
-    if (process.env.NBRS_E2E !== '1' && process.env.NBRS_DISABLE_AUTO_UPDATE !== '1') {
+    if (process.env.NBRS_E2E !== '1' && process.env.NBRS_DISABLE_AUTO_UPDATE !== '1' && store.getSettings().autoCheckUpdates !== false) {
       updater.startPeriodicCheck();
     }
     const diskTimer = setInterval(() => {

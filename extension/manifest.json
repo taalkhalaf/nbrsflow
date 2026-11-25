@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "nbrsflow Download Catcher",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "Intercept browser downloads and direct links and send them directly to nbrsflow (aria2).",
   "permissions": [
     "downloads",

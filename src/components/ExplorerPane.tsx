@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileEntry, FolderIndicator, NbrsAPI } from '../types';
-import { PRESET_FOLDER_TAGS } from '../types/metadata';
 import type { Dict, Lang } from '../i18n';
 import {
-  breadcrumbs, canDropOn, endDrag, fileIcon, formatBytes, formatDate, getDragging, hasDrag, matchesType, parentOf,
+  breadcrumbs, canDropOn, endDrag, fileIcon, formatBytes, formatDate, getDragging, hasDrag, isExtractableArchive, matchesType, parentOf,
   readDrag, samePath, startDrag, type TypeFilter
 } from '../lib/utils';
 import { colorHex } from '../lib/palette';
@@ -26,14 +25,17 @@ import {
 import { useHoverCard } from './HoverCard';
 import { useMeta } from '../lib/meta';
 
-export type ActionKind = 'open' | 'rename' | 'move' | 'delete' | 'extract' | 'reveal';
+export type ActionKind = 'open' | 'rename' | 'move' | 'delete' | 'extract' | 'extract_here' | 'reveal';
+export type ExplorerView = 'grid' | 'list' | 'content';
+export type SortField = 'name' | 'modified' | 'size' | 'type';
+export type GroupField = 'none' | 'type' | 'tag';
 
 interface Props {
   api: NbrsAPI | undefined;
   root: string;
   path: string;
   active: boolean;
-  view: 'grid' | 'list';
+  view: ExplorerView;
   search: string;
   typeFilter: TypeFilter;
   lang: Lang;
@@ -43,6 +45,7 @@ interface Props {
   canForward: boolean;
   autoOrganize?: boolean;
   dragDropEnabled?: boolean;
+  dragMergeToCreateFolder?: boolean;
   highlightDuplicates?: boolean;
   dual?: boolean;
   autoColor?: boolean;
@@ -54,6 +57,7 @@ interface Props {
   onNewFolder?: (targetDir: string) => void;
   onToggleAutoOrganize?: () => void;
   onToggleView?: () => void;
+  onSetView?: (v: ExplorerView) => void;
   onToggleDual?: () => void;
   onToggleDuplicates?: () => void;
   onOrganizeNow?: () => void;
@@ -68,17 +72,21 @@ interface Props {
   onStats: (visible: number, selected: number) => void;
   onAction: (kind: ActionKind, paths: string[]) => void;
   onDropItems: (paths: string[], target: string) => void;
+  onMergeToFolder?: (sources: string[], targetFile: string) => void;
 }
 
 const PANE = '__pane__';
 
 const folderSizeCache = new Map<string, { size: number; modifiedMs: number }>();
 const folderIndicatorCache = new Map<string, { info: FolderIndicator; modifiedMs: number }>();
+const thumbnailCache = new Map<string, { dataUrl: string | null; modifiedMs: number }>();
+const IMAGE_THUMB_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
 
 function invalidateFolderSizeCache(changedPaths?: string[]): void {
   if (!changedPaths) {
     folderSizeCache.clear();
     folderIndicatorCache.clear();
+    thumbnailCache.clear();
     return;
   }
   if (changedPaths.length === 0) return;
@@ -94,6 +102,11 @@ function invalidateFolderSizeCache(changedPaths?: string[]): void {
         folderIndicatorCache.delete(key);
       }
     }
+    for (const key of thumbnailCache.keys()) {
+      if (cp === key || cp.startsWith(key + '\\') || cp.startsWith(key + '/')) {
+        thumbnailCache.delete(key);
+      }
+    }
   }
 }
 
@@ -103,8 +116,13 @@ export default function ExplorerPane(p: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sizes, setSizes] = useState<Record<string, number>>({});
   const [folderIndicators, setFolderIndicators] = useState<Record<string, FolderIndicator>>({});
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [groupBy, setGroupBy] = useState<GroupField>('none');
   const [err, setErr] = useState('');
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; targets: FileEntry[] } | null>(null);
   const meta = useMeta();
   const hover = useHoverCard(350);
@@ -228,16 +246,80 @@ export default function ExplorerPane(p: Props) {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const dir = sortDir === 'asc' ? 1 : -1;
     return entries
       .filter((e) =>
         matchesType(e, typeFilter) &&
         (!q ||
           e.name.toLowerCase().includes(q) ||
           (meta.metaOf(e.path)?.summary ?? '').toLowerCase().includes(q) ||
+          (meta.metaOf(e.path)?.tag ?? '').toLowerCase().includes(q) ||
           (meta.metaOf(e.path)?.aliases ?? []).some((a) => a.toLowerCase().includes(q)))
       )
-      .sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name, undefined, { numeric: true }));
-  }, [entries, search, typeFilter, meta]);
+      .sort((a, b) => {
+        if (groupBy === 'tag') {
+          const ta = (a.isDirectory ? meta.metaOf(a.path)?.tag : undefined) ?? '\uffff';
+          const tb = (b.isDirectory ? meta.metaOf(b.path)?.tag : undefined) ?? '\uffff';
+          const tc = ta.localeCompare(tb);
+          if (tc !== 0) return tc;
+        } else if (groupBy === 'type') {
+          const rank = (x: FileEntry) => x.isDirectory ? '0' : isExtractableArchive(x.extension) ? '4' : x.extension || '9';
+          const rc = rank(a).localeCompare(rank(b));
+          if (rc !== 0 && (a.isDirectory !== b.isDirectory || groupBy === 'type')) {
+            if (a.isDirectory || b.isDirectory) return Number(b.isDirectory) - Number(a.isDirectory);
+          }
+        }
+        const folderCmp = Number(b.isDirectory) - Number(a.isDirectory);
+        if (folderCmp !== 0) return folderCmp;
+        let cmp = 0;
+        if (sortBy === 'modified') cmp = a.modifiedMs - b.modifiedMs;
+        else if (sortBy === 'size') {
+          const sa = a.isDirectory ? (sizes[a.path] ?? 0) : a.size;
+          const sb = b.isDirectory ? (sizes[b.path] ?? 0) : b.size;
+          cmp = sa - sb;
+        } else if (sortBy === 'type') {
+          cmp = (a.extension || '').localeCompare(b.extension || '') || a.name.localeCompare(b.name, undefined, { numeric: true });
+        } else {
+          cmp = a.name.localeCompare(b.name, undefined, { numeric: true });
+        }
+        return cmp * dir;
+      });
+  }, [entries, search, typeFilter, meta, sortBy, sortDir, groupBy, sizes]);
+
+  // Lazy-load thumbnails for image files and folders in small batches without blocking UI.
+  useEffect(() => {
+    if (!api?.files.getThumbnail || view === 'list') return;
+    let cancel = false;
+    const candidates = visible.filter((f) => f.isDirectory || IMAGE_THUMB_EXTS.has(f.extension)).slice(0, 60);
+    const cached: Record<string, string> = {};
+    const toLoad: FileEntry[] = [];
+    for (const f of candidates) {
+      const k = f.path.toLowerCase();
+      const c = thumbnailCache.get(k);
+      if (c && c.modifiedMs === f.modifiedMs) {
+        if (c.dataUrl) cached[f.path] = c.dataUrl;
+      } else {
+        toLoad.push(f);
+      }
+    }
+    if (Object.keys(cached).length > 0) setThumbnails((prev) => ({ ...prev, ...cached }));
+    if (toLoad.length === 0) return;
+
+    let idx = 0;
+    const worker = async () => {
+      while (!cancel && idx < toLoad.length) {
+        const item = toLoad[idx++];
+        try {
+          const url = await api.files.getThumbnail(item.path);
+          if (cancel) return;
+          thumbnailCache.set(item.path.toLowerCase(), { dataUrl: url, modifiedMs: item.modifiedMs });
+          if (url) setThumbnails((prev) => (prev[item.path] === url ? prev : { ...prev, [item.path]: url }));
+        } catch { /* ignore */ }
+      }
+    };
+    void Promise.all([worker(), worker(), worker()]);
+    return () => { cancel = true; };
+  }, [api, visible, view]);
 
   // Ask for content-based color suggestions for the folders shown (only does work when auto-color is on).
   useEffect(() => { meta.requestAuto(entries.filter((x) => x.isDirectory).map((x) => x.path)); }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -363,7 +445,10 @@ export default function ExplorerPane(p: Props) {
     if (targets.length >= 2 && p.onBatchRename) {
       items.push({ label: t.batchRenameTitle, onClick: () => p.onBatchRename?.(targets) });
     }
-    if (one && one.extension === '.zip') items.push({ label: t.extractHere, onClick: () => p.onAction('extract', paths) });
+    if (one && isExtractableArchive(one.extension)) {
+      items.push({ label: t.extractToFolder, onClick: () => p.onAction('extract', paths) });
+      items.push({ label: t.extractHereCurrent, onClick: () => p.onAction('extract_here', paths) });
+    }
     if (one) items.push({ label: t.reveal, onClick: () => p.onAction('reveal', paths) });
     if (targets.every((x) => x.isDirectory)) {
       items.push('sep', {
@@ -373,7 +458,8 @@ export default function ExplorerPane(p: Props) {
       }, {
         kind: 'tags',
         label: t.folderTags,
-        presets: PRESET_FOLDER_TAGS,
+        userTags: meta.allTags(),
+        emptyHint: t.tagEmptyHint,
         clearLabel: t.tagClear,
         customPlaceholder: t.tagCustomPlaceholder,
         setLabel: t.tagSet,
@@ -429,9 +515,30 @@ export default function ExplorerPane(p: Props) {
     onMouseLeave: hover.onLeave,
     onMouseDown: hover.onLeave
   });
-  const icon = (f: FileEntry, cls: string) => f.isDirectory
-    ? <FolderIcon color={meta.colorOf(f.path)} tag={cls.includes('h-10') ? meta.metaOf(f.path)?.tag : undefined} className={cls} />
-    : <span className={cls === 'h-10 w-10' ? 'text-4xl' : ''}>{fileIcon(f)}</span>;
+  const icon = (f: FileEntry, cls: string) => {
+    const thumb = thumbnails[f.path];
+    if (f.isDirectory) {
+      return (
+        <FolderIcon
+          color={meta.colorOf(f.path)}
+          tag={cls.includes('h-10') ? meta.metaOf(f.path)?.tag : undefined}
+          thumbnail={cls.includes('h-10') ? thumb : undefined}
+          className={cls}
+        />
+      );
+    }
+    if (thumb && cls.includes('h-10')) {
+      return (
+        <img
+          src={thumb}
+          alt={f.name}
+          data-testid="file-thumbnail-preview"
+          className="h-10 w-10 rounded-lg border border-line object-cover shadow-sm"
+        />
+      );
+    }
+    return <span className={cls === 'h-10 w-10' ? 'text-4xl' : ''}>{fileIcon(f)}</span>;
+  };
   const noteDot = (f: FileEntry) => meta.metaOf(f.path)?.summary
     ? <span title={t.hasSummary} data-testid="note-indicator" className="text-[11px] leading-none text-silver">🗒</span> : null;
   const colorDot = (f: FileEntry) => { const c = f.isDirectory ? meta.colorOf(f.path) : undefined; return c ? <span data-testid="color-badge" className="h-2 w-2 rounded-full" style={{ background: colorHex(c) }} /> : null; };
@@ -520,17 +627,43 @@ export default function ExplorerPane(p: Props) {
   };
 
   const itemCls = (f: FileEntry) =>
-    dropTarget === f.path ? 'bg-panel2 ring-1 ring-silver'
+    mergeTarget === f.path ? 'bg-amber-500/10 ring-2 ring-amber-400/80'
+    : dropTarget === f.path ? 'bg-panel2 ring-1 ring-silver'
     : selected.has(f.path) ? 'bg-panel2 ring-1 ring-silver/60' : 'hover:bg-panel';
   const dragEnabled = p.dragDropEnabled !== false;
+  const canMergeOnto = (paths: string[], targetFile: FileEntry) =>
+    p.dragMergeToCreateFolder === true &&
+    !targetFile.isDirectory &&
+    paths.length > 0 &&
+    !paths.some((x) => samePath(x, targetFile.path));
   const dnd = (f: FileEntry) => dragEnabled ? ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => { hover.onLeave(); dragStart(e, f); },
-    onDragEnd: () => { endDrag(); setDropTarget(null); },
+    onDragEnd: () => { endDrag(); setDropTarget(null); setMergeTarget(null); },
     ...(f.isDirectory ? {
       onDragOver: (e: React.DragEvent) => dragOverTarget(e, f.path, f.path),
       onDragLeave: (e: React.DragEvent) => dragLeave(e, f.path),
       onDrop: (e: React.DragEvent) => drop(e, f.path)
+    } : p.dragMergeToCreateFolder ? {
+      onDragOver: (e: React.DragEvent) => {
+        if (!hasDrag(e)) return;
+        if (!canMergeOnto(getDragging(), f)) { setMergeTarget((m) => (m === f.path ? null : m)); return; }
+        e.preventDefault(); e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        setDropTarget(null);
+        setMergeTarget(f.path);
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        if (!(e.currentTarget as Node).contains(e.relatedTarget as Node)) setMergeTarget((m) => (m === f.path ? null : m));
+      },
+      onDrop: (e: React.DragEvent) => {
+        if (!hasDrag(e)) return;
+        e.preventDefault(); e.stopPropagation();
+        setMergeTarget(null);
+        const paths = readDrag(e);
+        endDrag();
+        if (canMergeOnto(paths, f)) p.onMergeToFolder?.(paths, f.path);
+      }
     } : {})
   }) : {};
   const sizeText = (f: FileEntry) => f.isDirectory ? (sizes[f.path] === undefined ? '…' : formatBytes(sizes[f.path])) : formatBytes(f.size);
@@ -719,6 +852,144 @@ export default function ExplorerPane(p: Props) {
         )}
       </div>
 
+      {/* Compact Sort / Group / View & Selection Quick Actions Bar */}
+      <div data-testid="explorer-subbar" className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-line/70 bg-panel/60 px-2.5 text-[11px] text-silver">
+        {selected.size > 0 ? (
+          <div data-testid="selection-quick-actions" className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+            <span className="shrink-0 font-medium text-fg">{selected.size} {t.selectedCount}</span>
+            <span className="text-line">|</span>
+            {selected.size === 1 && (
+              <>
+                <button
+                  type="button"
+                  data-testid="quick-copy-path-btn"
+                  onClick={() => p.onCopyPath([...selected][0])}
+                  className="shrink-0 rounded px-1.5 py-0.5 hover:bg-panel2 hover:text-fg"
+                >
+                  {t.copyPath}
+                </button>
+                <button
+                  type="button"
+                  data-testid="quick-open-location-btn"
+                  onClick={() => p.onAction('reveal', [...selected])}
+                  className="shrink-0 rounded px-1.5 py-0.5 hover:bg-panel2 hover:text-fg"
+                >
+                  {t.openLocation}
+                </button>
+                {(() => {
+                  const selEntry = entries.find((x) => x.path === [...selected][0]);
+                  if (!selEntry || selEntry.isDirectory) return null;
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        data-testid="quick-checksum-btn"
+                        onClick={() => meta.verifyChecksum(selEntry.path)}
+                        className="shrink-0 rounded px-1.5 py-0.5 hover:bg-panel2 hover:text-fg"
+                      >
+                        {t.verifyChecksum}
+                      </button>
+                      {isExtractableArchive(selEntry.extension) && (
+                        <button
+                          type="button"
+                          data-testid="quick-extract-btn"
+                          onClick={() => p.onAction('extract', [selEntry.path])}
+                          className="shrink-0 rounded px-1.5 py-0.5 text-sky-300 hover:bg-panel2"
+                        >
+                          {t.extractToFolder}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+                <button
+                  type="button"
+                  data-testid="quick-rename-btn"
+                  onClick={() => p.onAction('rename', [...selected])}
+                  className="shrink-0 rounded px-1.5 py-0.5 hover:bg-panel2 hover:text-fg"
+                >
+                  {t.rename}
+                </button>
+              </>
+            )}
+            {selected.size >= 2 && p.onBatchRename && (
+              <button
+                type="button"
+                data-testid="quick-batch-rename-btn"
+                onClick={() => p.onBatchRename?.(selectedEntries())}
+                className="shrink-0 rounded px-1.5 py-0.5 hover:bg-panel2 hover:text-fg"
+              >
+                {t.batchRenameTitle}
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="quick-delete-btn"
+              onClick={() => p.onAction('delete', [...selected])}
+              className="shrink-0 rounded px-1.5 py-0.5 text-rose-400 hover:bg-panel2"
+            >
+              {t.deleteToTrash}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1">
+              <span className="text-muted">{t.sortBy}:</span>
+              <select
+                data-testid="explorer-sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortField)}
+                className="rounded border border-line bg-bg px-1.5 py-0.5 text-[11px] text-fg outline-none"
+              >
+                <option value="name">{t.sortName}</option>
+                <option value="modified">{t.sortModified}</option>
+                <option value="size">{t.sortSize}</option>
+                <option value="type">{t.sortType}</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              data-testid="explorer-sort-dir-btn"
+              onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+              className="rounded border border-line bg-bg px-1.5 py-0.5 text-[11px] text-fg hover:border-silver"
+            >
+              {sortDir === 'asc' ? '↑' : '↓'}
+            </button>
+            <label className="flex items-center gap-1">
+              <span className="text-muted">{t.groupBy}:</span>
+              <select
+                data-testid="explorer-group-select"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupField)}
+                className="rounded border border-line bg-bg px-1.5 py-0.5 text-[11px] text-fg outline-none"
+              >
+                <option value="none">{t.groupNone}</option>
+                <option value="type">{t.groupType}</option>
+                <option value="tag">{t.groupTag}</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {p.onSetView && (
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-line bg-bg p-0.5">
+            {(['grid', 'list', 'content'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                data-testid={`explorer-view-${v}`}
+                onClick={() => p.onSetView?.(v)}
+                className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                  view === v ? 'bg-panel2 font-medium text-fg' : 'text-muted hover:text-fg'
+                }`}
+              >
+                {v === 'grid' ? t.gridView : v === 'list' ? t.listView : t.contentView}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div
         ref={scrollRef}
         data-testid="pane-items"
@@ -763,6 +1034,11 @@ export default function ExplorerPane(p: Props) {
           {renderedGridItems.map((f) => (
             <button key={f.path} data-explorer-item="true" data-item-path={f.path} title={f.name} onClick={(e) => click(e, f)} onDoubleClick={() => open(f)} onContextMenu={(e) => onContext(e, f)}
               {...dnd(f)} {...hoverProps(f)} className={`relative flex flex-col items-center gap-1 rounded-xl p-3 text-center ${itemCls(f)}`}>
+              {mergeTarget === f.path && (
+                <span data-testid="drag-merge-badge" className="pointer-events-none absolute -top-2 z-20 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-black shadow">
+                  {t.dragMergeTip}
+                </span>
+              )}
               <span className="absolute end-2 top-2 flex items-center gap-1">{colorDot(f)}{noteDot(f)}</span>
               <span className="absolute start-2 top-2">{statusBadge(f)}</span>
               {icon(f, 'h-10 w-10')}
@@ -770,6 +1046,54 @@ export default function ExplorerPane(p: Props) {
               <span className="text-[10px] text-muted">{sizeText(f)}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {visible.length > 0 && view === 'content' && (
+        <div className="divide-y divide-line/60 p-2" data-testid="explorer-content-view">
+          {visible.map((f) => {
+            const m = meta.metaOf(f.path);
+            const infoParts = [
+              f.isDirectory ? t.folders : (f.extension ? f.extension.slice(1).toUpperCase() : t.viewModeFiles),
+              sizeText(f),
+              formatDate(f.modifiedMs, lang),
+              m?.tag
+            ].filter(Boolean);
+            return (
+              <button
+                key={f.path}
+                data-explorer-item="true"
+                data-item-path={f.path}
+                onClick={(e) => click(e, f)}
+                onDoubleClick={() => open(f)}
+                onContextMenu={(e) => onContext(e, f)}
+                {...dnd(f)}
+                {...hoverProps(f)}
+                className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start ${itemCls(f)}`}
+              >
+                {mergeTarget === f.path && (
+                  <span data-testid="drag-merge-badge" className="pointer-events-none absolute end-3 top-1 z-20 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-black shadow">
+                    {t.dragMergeTip}
+                  </span>
+                )}
+                {icon(f, 'h-10 w-10')}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-fg">{f.name}</span>
+                    {statusBadge(f)}
+                    {colorDot(f)}
+                    {noteDot(f)}
+                  </div>
+                  <div className="truncate text-[11px] text-muted" dir="ltr">
+                    {infoParts.join(' · ')}
+                  </div>
+                  {m?.summary && (
+                    <div className="truncate text-[11px] text-silver">{m.summary}</div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 

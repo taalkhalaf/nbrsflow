@@ -10,6 +10,8 @@ export interface MetaCtx {
   setColor: (paths: string[], color: ColorId | null | 'auto') => void;
   /** Set (or clear with null) the category tag of folders. */
   setTag: (paths: string[], tag: string | null) => void;
+  /** All distinct user-created tags currently in metadata. */
+  allTags: () => string[];
   editSummary: (path: string) => void;
   editAliases: (path: string) => void;
   markOpened: (path: string) => void;
@@ -24,6 +26,7 @@ const noop: MetaCtx = {
   colorOf: () => undefined,
   setColor: () => undefined,
   setTag: () => undefined,
+  allTags: () => [],
   editSummary: () => undefined,
   editAliases: () => undefined,
   markOpened: () => undefined,

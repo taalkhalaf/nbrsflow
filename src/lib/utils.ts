@@ -6,9 +6,14 @@ const EXT: Record<Exclude<TypeFilter, 'all'>, string[]> = {
   video: ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.flv', '.m4v'],
   audio: ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'],
   docs: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.epub', '.csv'],
-  archives: ['.zip', '.rar', '.7z', '.tar', '.gz', '.iso'],
+  archives: ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tgz', '.iso'],
   apps: ['.exe', '.msi', '.msix', '.appx', '.bat', '.cmd']
 };
+
+export const EXTRACTABLE_ARCHIVE_EXTS = new Set(['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tgz']);
+export function isExtractableArchive(ext: string): boolean {
+  return EXTRACTABLE_ARCHIVE_EXTS.has(ext.toLowerCase());
+}
 
 export function matchesType(e: FileEntry, f: TypeFilter): boolean {
   if (f === 'all' || e.isDirectory) return true;

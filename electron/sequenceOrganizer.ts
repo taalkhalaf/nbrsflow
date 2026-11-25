@@ -400,11 +400,44 @@ function sameDir(a: string, b: string): boolean {
   return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 }
 
+export type UnifiedTypeCategory = 'docs' | 'apps' | 'audio' | 'images';
+
+const UNIFIED_CATEGORY_EXTS: Record<UnifiedTypeCategory, Set<string>> = {
+  docs: new Set(['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.epub', '.csv', '.rtf', '.odt', '.ods', '.odp']),
+  apps: new Set(['.exe', '.msi', '.msix', '.appx', '.bat', '.cmd']),
+  audio: new Set(['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma', '.opus']),
+  images: new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico'])
+};
+
+const UNIFIED_CATEGORY_ALIASES: Record<UnifiedTypeCategory, Set<string>> = {
+  docs: new Set(['documents', 'docs', 'المستندات', 'مستندات']),
+  apps: new Set(['executables', 'programs', 'apps', 'التطبيقات', 'البرامج', 'ملفات تنفيذية']),
+  audio: new Set(['audio', 'music', 'sounds', 'الصوتيات', 'صوتيات', 'موسيقى']),
+  images: new Set(['images', 'pictures', 'photos', 'الصور', 'صور'])
+};
+
+const UNIFIED_CATEGORY_NAMES: Record<UnifiedTypeCategory, { ar: string; en: string }> = {
+  docs: { ar: 'المستندات', en: 'Documents' },
+  apps: { ar: 'البرامج', en: 'Executables' },
+  audio: { ar: 'الصوتيات', en: 'Audio' },
+  images: { ar: 'الصور', en: 'Images' }
+};
+
+export function classifyUnifiedFolderCategory(fileName: string): UnifiedTypeCategory | null {
+  const ext = path.extname(String(fileName ?? '')).toLowerCase();
+  if (!ext) return null;
+  for (const [cat, set] of Object.entries(UNIFIED_CATEGORY_EXTS) as [UnifiedTypeCategory, Set<string>][]) {
+    if (set.has(ext)) return cat;
+  }
+  return null;
+}
+
 export interface AutoRouteContext {
   url: string;
   fileName: string;
   requestedDir?: string;
   rootDir: string;
+  language?: 'ar' | 'en';
   isAutoOrganizeEnabled: () => boolean;
   getTrackedDownloads: () => { id: string; fileName: string; destination: string; filePath?: string; status: string }[];
   getFolderAliases?: (folderPath: string) => string[];
@@ -449,6 +482,43 @@ export async function resolveAutoOrganizedDownloadDir(ctx: AutoRouteContext): Pr
   const existingFolders = dirents
     .filter((d) => d.isDirectory())
     .map((d) => ({ name: d.name, fullPath: path.join(root, d.name) }));
+
+  // 0. Unified type folders for non-series types (Documents, Executables, Audio, Images):
+  // never create per-file folders for these; route and collect them into one unified folder per type.
+  const unifiedCat = classifyUnifiedFolderCategory(ctx.fileName);
+  if (unifiedCat) {
+    const aliases = UNIFIED_CATEGORY_ALIASES[unifiedCat];
+    const existingCatDir = existingFolders.find((f) => aliases.has(f.name.toLowerCase()));
+    const targetName = existingCatDir?.name ?? UNIFIED_CATEGORY_NAMES[unifiedCat][ctx.language ?? 'ar'];
+    const groupDir = existingCatDir?.fullPath ?? path.join(root, targetName);
+    const existedBefore = existingCatDir !== undefined || fs.existsSync(groupDir);
+    await fs.promises.mkdir(groupDir, { recursive: true });
+    if (!existedBefore) {
+      ctx.onFolderAutoCreated?.(groupDir);
+    }
+
+    const retroMovedPaths: { from: string; to: string }[] = [];
+    for (const d of dirents) {
+      if (!d.isFile() || d.name.endsWith('.aria2')) continue;
+      if (classifyUnifiedFolderCategory(d.name) !== unifiedCat) continue;
+      const src = path.join(root, d.name);
+      try {
+        const [dest] = await moveItems(root, [src], groupDir);
+        if (dest && dest !== src) {
+          retroMovedPaths.push({ from: src, to: dest });
+          ctx.onRetroactiveMove?.(src, dest);
+        }
+      } catch {
+        // ignore if locked
+      }
+    }
+
+    return {
+      targetDir: groupDir,
+      autoGroupedFolder: path.basename(groupDir),
+      retroMovedPaths
+    };
+  }
 
   // 1. First: match normalizedTitle directly (or normalizedKey) or against explicit registered `aliases` of any existing folder
   let matchedFolder: { name: string; fullPath: string; viaAlias?: string } | null = null;
@@ -588,6 +658,7 @@ export async function resolveAutoOrganizedDownloadDir(ctx: AutoRouteContext): Pr
 }
 
 export interface OrganizeDirectoryOptions {
+  language?: 'ar' | 'en';
   getFolderAliases?: (folderPath: string) => string[];
   onRegisterDefaultAliases?: (folderPath: string, aliases: string[]) => void;
   onFolderAutoCreated?: (folderPath: string) => void;
@@ -617,10 +688,38 @@ export async function organizeDirectorySequences(
     }
   }
 
-  const looseFiles = dirents
-    .filter((d) => d.isFile() && !d.name.endsWith('.aria2'))
-    .map((d) => ({ name: d.name, fullPath: path.join(dir, d.name), info: normalizeTitle(d.name) }))
-    .filter((f) => f.info.normalizedTitle && f.info.normalizedTitle.length >= 2);
+  const dirBaseLower = path.basename(dir).toLowerCase();
+  const unifiedBuckets = new Map<UnifiedTypeCategory, { name: string; fullPath: string; existed: boolean; files: { name: string; fullPath: string }[] }>();
+  const sequenceCandidates: { name: string; fullPath: string; info: NormalizedSequenceInfo }[] = [];
+
+  for (const d of dirents) {
+    if (!d.isFile() || d.name.endsWith('.aria2')) continue;
+    const fullPath = path.join(dir, d.name);
+    const cat = classifyUnifiedFolderCategory(d.name);
+    if (cat && !UNIFIED_CATEGORY_ALIASES[cat].has(dirBaseLower)) {
+      let ub = unifiedBuckets.get(cat);
+      if (!ub) {
+        const aliases = UNIFIED_CATEGORY_ALIASES[cat];
+        const existingCat = existingFolders.find((f) => aliases.has(f.name.toLowerCase()));
+        const folderName = existingCat?.name ?? UNIFIED_CATEGORY_NAMES[cat][opts.language ?? 'ar'];
+        ub = {
+          name: folderName,
+          fullPath: existingCat?.fullPath ?? path.join(dir, folderName),
+          existed: existingCat !== undefined,
+          files: []
+        };
+        unifiedBuckets.set(cat, ub);
+      }
+      ub.files.push({ name: d.name, fullPath });
+      continue;
+    }
+    const info = normalizeTitle(d.name);
+    if (info.normalizedTitle && info.normalizedTitle.length >= 2) {
+      sequenceCandidates.push({ name: d.name, fullPath, info });
+    }
+  }
+
+  const looseFiles = sequenceCandidates;
 
   // Build canonical buckets (existing folders first, then longest/full titles)
   const buckets: {
@@ -658,6 +757,31 @@ export async function organizeDirectorySequences(
 
   let movedCount = 0;
   const groups: OrganizeGroupResult[] = [];
+
+  for (const ub of unifiedBuckets.values()) {
+    if (ub.files.length === 0) continue;
+    const existedBefore = ub.existed || fs.existsSync(ub.fullPath);
+    await fs.promises.mkdir(ub.fullPath, { recursive: true });
+    if (!existedBefore) {
+      opts.onFolderAutoCreated?.(ub.fullPath);
+    }
+    const movedNames: string[] = [];
+    for (const f of ub.files) {
+      const [dest] = await moveItems(root, [f.fullPath], ub.fullPath);
+      if (dest && dest !== f.fullPath) {
+        movedCount++;
+        movedNames.push(path.basename(dest));
+        opts.onMoved?.(f.fullPath, dest);
+      }
+    }
+    if (movedNames.length > 0) {
+      groups.push({
+        folderName: path.basename(ub.fullPath),
+        folderPath: ub.fullPath,
+        files: movedNames
+      });
+    }
+  }
 
   for (const bucket of buckets) {
     if (bucket.items.length === 0) continue;

@@ -66,13 +66,13 @@
 - [x] **Phase 8: Folder Coloring & Visual Tagging System**
   - [x] Design visual color palette picker and tagging interface for folders (7-color palette + default + content-based suggestion in Context Menu).
   - [x] Build local metadata store (`MetadataStore` v2) keyed by relative paths with automatic sync on rename, move, and trash.
-  - [x] Render custom Windows-style layered folder icons (`FolderIcon.tsx`), color badges, preset/custom folder tags (`أنمي`، `كرتون`، `مسلسل`، `فيلم`، `فيلم أنمي` + custom) rendered on folder icons, `groupFoldersByTag` option (default `false`), and summary note indicators in both sidebar tree and file explorer views.
+  - [x] Render custom Windows-style layered folder icons (`FolderIcon.tsx`), color badges, free-form user-created folder tags (no hardcoded presets) rendered on folder icons with `groupFoldersByTag` option (default `false`), and summary note indicators in both sidebar tree and file explorer views.
   - [x] Support auto-color rule based on dominant folder content (`autoColor` toggle in TopBar) and search across item names and saved summaries.
 
 - [ ] **Phase 9: Quick Hover Summaries & Media Preview Engine** (hover summaries + `.zip` archive listing + download provenance done; media metadata & `.rar`/`.7z` pending)
   - [x] Implement non-intrusive floating hover card (`HoverCard`) with 350ms delay showing item name, full multi-line summary, size, and modified date.
   - [ ] Extract and display media metadata (video resolution/duration, audio bitrate/cover art, image dimensions).
-  - [x] Inspect compressed `.zip` archives in Quick Preview (`readFilePreview` + `QuickPreviewModal` listing contents without full extraction; `.rar`/`.7z` pending).
+  - [x] Inspect compressed archives (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.xz`, `.tgz`) in Quick Preview (`readFilePreview` + `QuickPreviewModal`) and extract directly (`folder` / `here`) with configurable post-extract actions (`keep` / `trash` / `move_to_archive`).
   - [x] Show download provenance (original URL and download date in `QuickPreviewModal`) if downloaded via nbrsflow.
 
 - [x] **Phase 10: Smart Shortcut & Acronym Matching Search Bar** (alias & acronym engine + folder alias dialog + search + global command palette done)
@@ -89,7 +89,7 @@
 
 - [x] **Phase 12: Production Packaging, Windows Installer & GitHub Release** (Windows x64 NSIS, unpacked `.exe` & official brand `.ico` built & verified; GitHub Actions deferred)
   - [x] Configure `electron-builder` for Windows x64 (`nsis`) with `extraResources` bundling `resources/bin/win32/aria2c.exe`, `extension/`, and `resources/brand/`.
-  - [x] Build unpacked executable (`release\win-unpacked\nbrsflow.exe`) and NSIS installer (`release\nbrsflow-setup-0.2.9.exe`), verified in packaged mode (`app.isPackaged === true`).
-  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (pushed `Release v0.2.11` to `https://github.com/taalkhalaf/nbrsflow.git` on `origin/main` and published GitHub Release `https://github.com/taalkhalaf/nbrsflow/releases/tag/v0.2.11` with `nbrsflow-setup-0.2.11.exe`).
+  - [x] Build unpacked executable (`release\win-unpacked\nbrsflow.exe`) and NSIS installer (`release\nbrsflow-setup-0.2.12.exe`), verified in packaged mode (`app.isPackaged === true`).
+  - [x] Update comprehensive bilingual `README.md`, `CHANGELOG.md`, `LICENSE` + third-party `aria2` notice, and verify `.gitignore` excludes `dist/`, `dist-electron/`, `release/`, `out/`, and `*.exe` (pushed `Release v0.2.12` to `https://github.com/taalkhalaf/nbrsflow.git` on `origin/main` and published GitHub Release `https://github.com/taalkhalaf/nbrsflow/releases/tag/v0.2.12` with `nbrsflow-setup-0.2.12.exe`).
   - [x] In-app GitHub Releases update checker & one-click auto-updater (`electron/appUpdater.ts`, `TopBar.tsx`, `SettingsDialog.tsx`, `App.tsx`).
   - [x] Integrate official `nbrsflow_brand_package` `.ico`/`.png` application, tray, extension, and NSIS installer icons (GitHub Actions automated release workflow deferred).

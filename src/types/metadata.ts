@@ -1,8 +1,8 @@
 export const COLOR_IDS = ['blue', 'green', 'purple', 'orange', 'red', 'gray', 'teal'] as const;
 export type ColorId = (typeof COLOR_IDS)[number];
 
-export const PRESET_FOLDER_TAGS = ['أنمي', 'كرتون', 'مسلسل', 'فيلم', 'فيلم أنمي'] as const;
 export type ViewMode = 'default' | 'downloads' | 'files';
+export type AfterExtractAction = 'keep' | 'trash' | 'move_to_archive';
 
 /** User-provided metadata attached to a file or folder. */
 export interface ItemMeta {
@@ -84,4 +84,12 @@ export interface AppSettings {
   autoMoveCompletedSeries?: boolean;
   /** Automatically group folders with the same tag into a dedicated tag folder (default false). */
   groupFoldersByTag?: boolean;
+  /** Whether the first-run Setup Wizard has been completed. */
+  setupCompleted?: boolean;
+  /** Automatically check for updates on startup/periodically (default true). */
+  autoCheckUpdates?: boolean;
+  /** Action to take on archive file after extraction ('keep' | 'trash' | 'move_to_archive'). */
+  afterExtractAction?: AfterExtractAction;
+  /** Optional opt-in drag-and-drop merge: dragging an item onto another file creates a new folder (default false). */
+  dragMergeToCreateFolder?: boolean;
 }

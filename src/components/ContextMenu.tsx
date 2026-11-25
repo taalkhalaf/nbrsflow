@@ -20,11 +20,12 @@ export interface ColorRow {
   onPick: (c: ColorId | null | 'auto') => void;
 }
 
-/** A row of preset + custom folder tags. */
+/** A row of user-created free-form folder tags (no hardcoded presets). */
 export interface TagRow {
   kind: 'tags';
   label: string;
-  presets: readonly string[];
+  userTags: string[];
+  emptyHint?: string;
   clearLabel: string;
   customPlaceholder: string;
   setLabel: string;
@@ -100,21 +101,25 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
                   >{it.clearLabel}</button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1">
-                {it.presets.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    data-tag={tag}
-                    onClick={() => pickTag(tag)}
-                    className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
-                      it.current === tag
-                        ? 'border-silver bg-panel2 font-medium text-fg'
-                        : 'border-line bg-bg text-silver hover:border-silver hover:text-fg'
-                    }`}
-                  >{tag}</button>
-                ))}
-              </div>
+              {it.userTags.length > 0 ? (
+                <div className="flex flex-wrap gap-1" data-testid="user-tags-list">
+                  {it.userTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      data-tag={tag}
+                      onClick={() => pickTag(tag)}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
+                        it.current === tag
+                          ? 'border-silver bg-panel2 font-medium text-fg'
+                          : 'border-line bg-bg text-silver hover:border-silver hover:text-fg'
+                      }`}
+                    >{tag}</button>
+                  ))}
+                </div>
+              ) : it.emptyHint ? (
+                <div className="text-[11px] text-muted" data-testid="user-tags-empty-hint">{it.emptyHint}</div>
+              ) : null}
               <div className="mt-1.5 flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
                 <input
                   data-testid="custom-tag-input"
